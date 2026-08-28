@@ -5,15 +5,18 @@
   --ink:#0e2035; --muted:#56637a; --faint:#8794a6;
   --paper:#eef1f5; --surface:#ffffff; --surface-2:#f5f7fa;
   --border:#d8dee6; --border-soft:#e6eaf0;
-  --accent:#2a5fb0; --accent-ink:#ffffff; --accent-soft:#e3ecf9; --accent-dim:#8aa9d6;
+  --accent:#2454a3; --accent-ink:#ffffff; --accent-soft:#e3ecf9; --accent-dim:#8aa9d6;
+  --accent-2:#1c7d8f;
   --warm:#c9701f; --warm-soft:#f7e7d6;
   --good:#2f8f5b; --good-soft:#e2f3ea;
   --warn:#a9761a; --warn-soft:#f6ecd6;
   --bad:#c0392b; --bad-soft:#fbe6e3;
   --none:#8592a4; --none-soft:#eceff3;
   --shadow: 0 1px 2px rgba(14,32,53,.06), 0 8px 24px -12px rgba(14,32,53,.18);
-  --radius: 10px;
-  --header-bg:#0e2035; --header-text:#f3f6fa; --header-muted:#aab8ce;
+  --shadow-lg: 0 2px 4px rgba(14,32,53,.07), 0 20px 44px -16px rgba(14,32,53,.28);
+  --radius: 10px; --radius-lg: 16px;
+  --header-bg:#0b1a30; --header-bg-2:#132a4d; --header-text:#f3f6fa; --header-muted:#aab8ce;
+  --ease: cubic-bezier(.2,.7,.3,1);
 }
 /* Dark palette: applied when the OS prefers dark AND the user hasn't chosen
    "light" explicitly, or whenever the user has explicitly chosen "dark". The
@@ -25,7 +28,7 @@
     --ink:#e8edf5; --muted:#9aa7bb; --faint:#6b7890;
     --paper:#0b1220; --surface:#141d2e; --surface-2:#1b2537;
     --border:#2a3550; --border-soft:#232d44;
-    --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a;
+    --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a; --accent-2:#3f7a8c;
     --warm:#e0973f; --warm-soft:#3a2c17;
     --good:#4caf7d; --good-soft:#16301f;
     --warn:#d9a53e; --warn-soft:#3a2f12;
@@ -38,7 +41,7 @@
   --ink:#e8edf5; --muted:#9aa7bb; --faint:#6b7890;
   --paper:#0b1220; --surface:#141d2e; --surface-2:#1b2537;
   --border:#2a3550; --border-soft:#232d44;
-  --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a;
+  --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a; --accent-2:#3f7a8c;
   --warm:#e0973f; --warm-soft:#3a2c17;
   --good:#4caf7d; --good-soft:#16301f;
   --warn:#d9a53e; --warn-soft:#3a2f12;
@@ -58,6 +61,7 @@ body{
 h1,h2,h3{font-family:"Archivo","IBM Plex Sans",sans-serif; margin:0; text-wrap:balance;}
 button,input,select,textarea{font-family:inherit; font-size:inherit;}
 button{cursor:pointer;}
+button,.btn,.nav-item,.card,.cat-chip,.entry-card,.goal-card,input,select,textarea{ transition:background-color .15s var(--ease), border-color .15s var(--ease), box-shadow .18s var(--ease), transform .15s var(--ease), color .15s var(--ease); }
 .mono{font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums;}
 a{color:var(--accent);}
 #root{min-height:100%;}
@@ -74,11 +78,32 @@ a{color:var(--accent);}
 
 .login-wrap{
   min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
-  background:linear-gradient(180deg, var(--header-bg) 0%, var(--header-bg) 38%, var(--paper) 38%);
+  background:
+    radial-gradient(1100px 620px at 15% -10%, rgba(36,84,163,.10), transparent 60%),
+    radial-gradient(900px 520px at 100% 100%, rgba(28,125,143,.08), transparent 55%),
+    var(--paper);
 }
+.login-shell{
+  width:100%; max-width:840px; display:flex; border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-lg);
+  background:var(--surface);
+}
+.login-hero{
+  flex:1 1 46%; background:linear-gradient(160deg, var(--header-bg-2) 0%, var(--header-bg) 68%); color:var(--header-text);
+  padding:32px 30px; display:flex; flex-direction:column; gap:16px; position:relative; overflow:hidden;
+}
+.login-hero-illustration{ margin-top:auto; opacity:.94; width:100%; height:auto; display:block; }
+.login-hero-content{ display:flex; flex-direction:column; gap:6px; }
+.login-hero-title{ font-size:23px; font-weight:800; font-family:"Archivo","IBM Plex Sans",sans-serif; }
+.login-hero-tag{ font-size:12.5px; color:var(--header-muted); line-height:1.55; max-width:280px; }
 .login-card{
-  width:100%; max-width:380px; background:var(--surface); border-radius:14px; box-shadow:var(--shadow);
-  padding:28px 26px; display:flex; flex-direction:column; gap:16px;
+  flex:1 1 54%; width:100%; background:var(--surface);
+  padding:34px 32px; display:flex; flex-direction:column; gap:16px; justify-content:center;
+}
+@media (max-width:680px){
+  .login-shell{ flex-direction:column; max-width:420px; }
+  .login-hero{ padding:24px 24px 18px; gap:10px; }
+  .login-hero-illustration{ display:none; }
+  .login-card{ padding:26px 24px; }
 }
 .lang-switch{ display:flex; gap:3px; }
 .lang-switch button{ background:transparent; border:1px solid rgba(255,255,255,.22); color:var(--header-muted); font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; letter-spacing:.03em; }
@@ -102,9 +127,9 @@ a{color:var(--accent);}
 .archive-table td{ vertical-align:middle; padding:4px 8px; }
 .archive-goal-label{ font-size:12.5px; font-weight:600; color:var(--ink); max-width:260px; }
 
-.login-eyebrow{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent-dim); font-weight:600; text-align:center;}
-.login-title{font-size:21px; font-weight:800; text-align:center;}
-.login-sub{font-size:12.5px; color:var(--muted); text-align:center; margin-top:-8px;}
+.login-eyebrow{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent-dim); font-weight:700;}
+.login-title{font-size:22px; font-weight:800;}
+.login-sub{font-size:12.5px; color:var(--muted); margin-top:-6px;}
 .field{display:flex; flex-direction:column; gap:5px;}
 .field label{font-size:11.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
 .field input, .field select, .field textarea{
@@ -116,9 +141,10 @@ a{color:var(--accent);}
   border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px;
   padding:9px 14px; font-size:13.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px; justify-content:center;
 }
-.btn:hover{border-color:var(--accent-dim);}
-.btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
-.btn-primary:hover{ filter:brightness(1.06); }
+.btn:hover{border-color:var(--accent-dim); transform:translateY(-1px);}
+.btn:active{ transform:translateY(0); }
+.btn-primary{ background:linear-gradient(180deg, var(--accent), var(--accent-2)); border-color:var(--accent); color:var(--accent-ink); }
+.btn-primary:hover{ filter:brightness(1.08); }
 .btn-good{ background:var(--good); border-color:var(--good); color:#fff; }
 .btn-bad{ background:var(--bad); border-color:var(--bad); color:#fff; }
 .btn-sm{ padding:5px 10px; font-size:12px; border-radius:7px; }
@@ -174,6 +200,7 @@ a{color:var(--accent);}
 
 /* ---------------- generic cards / tables ---------------- */
 .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; }
+.cat-chip:hover, .entry-card:hover, .goal-card:hover{ box-shadow:var(--shadow-lg); transform:translateY(-2px); }
 .grid{ display:grid; gap:14px; }
 .grid-cards{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
 
@@ -232,6 +259,11 @@ table.data-table tr:hover td{ background:var(--surface-2); }
 .deadline-done{ background:var(--none-soft); color:var(--none); text-decoration:line-through; }
 
 .empty-state{ text-align:center; padding:40px 20px; color:var(--muted); font-size:13px; }
+.empty-state::before{
+  content:""; display:block; width:44px; height:44px; margin:0 auto 12px; opacity:.55;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3.5 9.5 6 4h12l2.5 5.5' fill='none' stroke='%238794a6' stroke-width='1.5' stroke-linejoin='round'/%3E%3Crect x='3.5' y='9.5' width='17' height='9.5' rx='1.5' fill='none' stroke='%238794a6' stroke-width='1.5'/%3E%3Cpath d='M3.5 9.5h17M10 13.2h4' stroke='%238794a6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:center; background-size:contain;
+}
 
 .toast{
   position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
