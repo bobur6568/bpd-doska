@@ -268,6 +268,14 @@ export function watchEntriesByMonth(month, cb){
   return onSnapshot(qy, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 }
 
+// Bir so'rovda bir nechta oy uchun barcha yozuvlarni oladi (diagrammalar/tarix
+// uchun) — "month" ustida oddiy "in" filtri, qo'shimcha composite index shart emas.
+export async function listEntriesForMonths(months){
+  if (!months || months.length === 0) return [];
+  const snap = await getDocs(query(collection(db, "entries"), where("month", "in", months)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 /* ============================================================
    ACTIONS (chora-tadbir + muddat)
    ============================================================ */
@@ -293,4 +301,24 @@ export async function listActions(){
 
 export function watchActions(cb){
   return onSnapshot(collection(db, "actions"), snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+}
+
+/* ============================================================
+   WARNINGS (sariq kartochka — bir pog'ona quyi darajaga ogohlantirish)
+   ============================================================ */
+export async function createWarning({ toUid, text }){
+  return addDoc(collection(db, "warnings"), {
+    fromUid: auth.currentUser.uid, toUid, text: text || "",
+    createdAt: serverTimestamp(), acknowledged: false, acknowledgedAt: null
+  });
+}
+export async function acknowledgeWarning(warningId){
+  return updateDoc(doc(db, "warnings", warningId), { acknowledged: true, acknowledgedAt: serverTimestamp() });
+}
+export async function listWarnings(){
+  const snap = await getDocs(collection(db, "warnings"));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+export function watchWarnings(cb){
+  return onSnapshot(collection(db, "warnings"), snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 }
