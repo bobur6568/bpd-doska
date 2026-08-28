@@ -4,9 +4,10 @@
 import * as fb from "./firebase.js";
 import {
   escapeHtml, currentMonth, monthYear, shiftMonth, fmtDateTime, fmtDate,
-  todayStr, daysUntil, compressImageFile, toast, initials, iconSvg
+  todayStr, daysUntil, compressImageFile, toast, initials, iconSvg,
+  lastNMonths, statusStripSvg, donutSvg, hBarChartSvg, lineChartSvg
 } from "./utils.js";
-import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName } from "./i18n.js";
+import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName, monthShort } from "./i18n.js";
 
 /* ============================================================
    SESSION / GLOBAL STATE
@@ -18,6 +19,8 @@ let usersById = {};          // uid -> user doc (cached)
 let entriesMonth = currentMonth();
 let entriesCache = {};       // month -> [entries]
 let actionsCache = null;
+let historyCache = null;     // flat list of entries across the last 6 months (for charts)
+let warningsCache = null;
 let activeView = "board";
 let activeCategoryId = null;
 let busy = false;
@@ -96,9 +99,11 @@ function loginErrorText(err){
 function NAV(){
   return [
     { id: "board", label: t("nav.board"), icon: "board", roles: null },
+    { id: "results", label: t("nav.results"), icon: "chart", roles: null },
     { id: "entry", label: t("nav.entry"), icon: "check", roles: ["elementOwner"] },
     { id: "approvals", label: t("nav.approvals"), icon: "bell", roles: ["goalOwner","responsible","boardOwner"] },
     { id: "actions", label: t("nav.actions"), icon: "link", roles: null },
+    { id: "warnings", label: t("nav.warnings"), icon: "warn", roles: ["boardOwner","responsible","goalOwner","elementOwner"] },
     { id: "assignments", label: t("nav.assignments"), icon: "users", roles: ["boardOwner","responsible","goalOwner"] },
     { id: "users", label: t("nav.users"), icon: "users", roles: ["admin"] },
     { id: "structure", label: t("nav.structure"), icon: "target", roles: ["admin"] },
@@ -128,6 +133,14 @@ async function loadCoreData(){
   entriesCache = {};
   entriesCache[entriesMonth] = await fb.listEntriesByMonth(entriesMonth);
   actionsCache = await fb.listActions();
+  warningsCache = await fb.listWarnings();
+  historyCache = null; // lazily (re)loaded by ensureHistoryLoaded() when a chart view opens
+}
+
+async function ensureHistoryLoaded(){
+  if (historyCache) return historyCache;
+  historyCache = await fb.listEntriesForMonths(lastNMonths(6));
+  return historyCache;
 }
 
 async function ensureMonthLoaded(month){
@@ -149,6 +162,9 @@ function pendingApprovalCount(){
 function myOpenActionsCount(){
   return (actionsCache||[]).filter(a => a.assignedTo === authUser.uid && a.status === "open").length;
 }
+function myUnackedWarningsCount(){
+  return (warningsCache||[]).filter(w => w.toUid === authUser.uid && !w.acknowledged).length;
+}
 
 function paintShell(){
   const nav = visibleNav();
@@ -164,6 +180,7 @@ function paintShell(){
           let count = 0;
           if (n.id === "approvals") count = pendingApprovalCount();
           if (n.id === "actions") count = myOpenActionsCount();
+          if (n.id === "warnings") count = myUnackedWarningsCount();
           return `<button class="nav-item ${activeView===n.id?'active':''}" data-nav="${n.id}">
             ${iconSvg(n.icon,15)}<span>${escapeHtml(n.label)}</span>
             ${count>0 ? `<span class="badge-count">${count}</span>` : ""}
@@ -197,9 +214,11 @@ async function renderMain(){
   el.innerHTML = `<div class="boot-screen" style="min-height:200px;"><div class="boot-spinner"></div></div>`;
   try {
     if (activeView === "board") return renderBoardView(el);
+    if (activeView === "results") return renderResultsView(el);
     if (activeView === "entry") return renderEntryView(el);
     if (activeView === "approvals") return renderApprovalsView(el);
     if (activeView === "actions") return renderActionsView(el);
+    if (activeView === "warnings") return renderWarningsView(el);
     if (activeView === "assignments") return renderAssignmentsView(el);
     if (activeView === "users") return renderUsersView(el);
     if (activeView === "structure") return renderStructureView(el);
@@ -216,6 +235,7 @@ function refreshSidebarBadges(){
     let count = 0;
     if (id === "approvals") count = pendingApprovalCount();
     if (id === "actions") count = myOpenActionsCount();
+    if (id === "warnings") count = myUnackedWarningsCount();
     const existing = b.querySelector(".badge-count");
     if (existing) existing.remove();
     if (count > 0) b.insertAdjacentHTML("beforeend", `<span class="badge-count">${count}</span>`);
@@ -265,6 +285,25 @@ function catCheck(cat, month){
   return "bad";
 }
 function findCat(id){ return structure.find(c => c.id===id) || null; }
+// Tarixiy (ko'p oylik) hisob-kitoblar — diagrammalar uchun, historyCache asosida.
+function entryFromHistory(elementId, month){
+  return (historyCache||[]).find(e => e.elementId===elementId && e.month===month) || null;
+}
+function elStatusForMonth(el, month){
+  const entry = entryFromHistory(el.id, month);
+  if (!entry || entry.status !== "locked") return null;
+  return computeStatus(entry.plan, entry.fact, el.direction);
+}
+function goalOkForMonth(goal, month){
+  const sts = goal.elements.map(el => elStatusForMonth(el, month));
+  if (sts.some(s => s===null)) return null;
+  return sts.every(s => s==="good");
+}
+function goalOkFraction(goal, months){
+  const known = months.map(m => goalOkForMonth(goal, m)).filter(v => v !== null);
+  if (known.length === 0) return null;
+  return known.filter(Boolean).length / known.length;
+}
 // Kategoriya/element egaligi faqat "structure" daraxtidan aniqlanadi —
 // foydalanuvchi hujjatida nusxa saqlanmaydi (yagona haqiqat manbai).
 function myCategory(){ return structure.find(c => c.goalOwnerUid === authUser.uid) || null; }
@@ -388,6 +427,7 @@ function bindEntryCard(it){
         await fb.submitEntry({ categoryId: it.cat.id, goalId: it.goal.id, elementId: it.el.id, month: entriesMonth, plan: Number(plan), fact: Number(fact), photo: pendingPhoto, direction: it.el.direction, unit: it.el.unit });
       }
       entriesCache[entriesMonth] = await fb.listEntriesByMonth(entriesMonth);
+      historyCache = null;
       toast(t("entry.submitted"));
       await renderMain();
     } catch (err) {
@@ -458,6 +498,7 @@ function bindApprovalCard(entry, stage){
     try {
       await fb.reviewEntry(entry.id, stage, decision, comment);
       entriesCache[entriesMonth] = await fb.listEntriesByMonth(entriesMonth);
+      historyCache = null;
       toast(decision==="approve" ? t("approvals.approved") : t("approvals.rejected"));
       refreshSidebarBadges();
       await renderMain();
@@ -560,6 +601,107 @@ function actionCardHtml(a, canComplete){
       ${canComplete && a.status==="open" ? `<button class="btn btn-good btn-sm" data-done-action="${a.id}">${escapeHtml(t("actions.markDone"))}</button>` : ""}
     </div>
     <div class="entry-meta" style="margin-top:6px;">${escapeHtml(t("actions.setBy"))}${escapeHtml(userLabel(a.setBy))}${escapeHtml(t("actions.assignee"))}${escapeHtml(userLabel(a.assignedTo))}</div>
+  </div>`;
+}
+
+/* ============================================================
+   WARNINGS VIEW (sariq kartochka — bir pog'ona quyi darajaga)
+   ============================================================ */
+async function renderWarningsView(el){
+  let targets = []; // [{uid, label}]
+  if (me.role === "boardOwner") {
+    const settings = await fb.getAssignmentSettings();
+    if (settings.responsibleUid && usersById[settings.responsibleUid]) {
+      const u = usersById[settings.responsibleUid];
+      targets = [{ uid: u.id, label: u.fullName || u.username }];
+    }
+  } else if (me.role === "responsible") {
+    structure.forEach(cat => {
+      if (cat.goalOwnerUid && usersById[cat.goalOwnerUid]) {
+        const u = usersById[cat.goalOwnerUid];
+        targets.push({ uid: u.id, label: `${u.fullName||u.username} — ${catName(cat)}` });
+      }
+    });
+  } else if (me.role === "goalOwner") {
+    const myCat = myCategory();
+    if (myCat) {
+      myCat.goals.forEach(goal => goal.elements.forEach(elm => {
+        if (elm.elementOwnerUid && usersById[elm.elementOwnerUid]) {
+          const u = usersById[elm.elementOwnerUid];
+          targets.push({ uid: u.id, label: `${u.fullName||u.username} — ${elm.name||t("assign.unnamedElement")}` });
+        }
+      }));
+    }
+  }
+  const seen = new Set();
+  targets = targets.filter(x => seen.has(x.uid) ? false : (seen.add(x.uid), true));
+
+  const canSend = ["boardOwner","responsible","goalOwner"].includes(me.role);
+  const byNewest = (a,b) => (b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0) - (a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0);
+  const received = (warningsCache||[]).filter(w => w.toUid === authUser.uid).sort(byNewest);
+  const sent = (warningsCache||[]).filter(w => w.fromUid === authUser.uid).sort(byNewest);
+
+  let formHtml = "";
+  if (canSend) {
+    formHtml = `<div class="card" style="margin-bottom:16px;max-width:480px;">
+      <h3 style="margin-bottom:10px;">${escapeHtml(t("warnings.giveTitle"))}</h3>
+      ${targets.length===0 ? `<div class="entry-meta">${escapeHtml(t("warnings.noTargets"))}</div>` : `
+      <div class="field"><label>${escapeHtml(t("warnings.target"))}</label>
+        <select id="warn-target"><option value="">${escapeHtml(t("warnings.selectTarget"))}</option>
+          ${targets.map(x=>`<option value="${x.uid}">${escapeHtml(x.label)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field"><label>${escapeHtml(t("warnings.reason"))}</label><textarea id="warn-text" rows="2" placeholder="${escapeHtml(t("warnings.reasonPh"))}"></textarea></div>
+      <button class="btn btn-bad" id="warn-submit" style="margin-top:8px;">${iconSvg("warn",14)} ${escapeHtml(t("warnings.give"))}</button>
+      <div class="error-text" id="warn-err"></div>`}
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="page-header"><div><div class="page-title">${escapeHtml(t("warnings.title"))}</div><div class="page-sub">${escapeHtml(t("warnings.sub"))}</div></div></div>
+    ${formHtml}
+    <h3 style="margin:6px 0 10px;">${escapeHtml(t("warnings.receivedTitle",{n:received.length}))}</h3>
+    ${received.length===0 ? `<div class="empty-state">${escapeHtml(t("warnings.receivedEmpty"))}</div>` : `<div class="grid grid-cards">${received.map(w=>warningCardHtml(w,true)).join("")}</div>`}
+    ${sent.length>0 ? `<h3 style="margin:22px 0 10px;">${escapeHtml(t("warnings.sentTitle",{n:sent.length}))}</h3><div class="grid grid-cards">${sent.map(w=>warningCardHtml(w,false)).join("")}</div>` : ""}
+  `;
+
+  const submitBtn = document.getElementById("warn-submit");
+  if (submitBtn) submitBtn.addEventListener("click", async () => {
+    const errEl = document.getElementById("warn-err");
+    errEl.textContent = "";
+    const toUid = document.getElementById("warn-target").value;
+    const text = document.getElementById("warn-text").value.trim();
+    if (!toUid) { errEl.textContent = t("warnings.selectTarget"); return; }
+    if (!text) { errEl.textContent = t("warnings.reasonRequired"); return; }
+    try {
+      await fb.createWarning({ toUid, text });
+      warningsCache = await fb.listWarnings();
+      toast(t("warnings.issued"));
+      refreshSidebarBadges();
+      await renderMain();
+    } catch (err) { errEl.textContent = t("common.error") + err.message; }
+  });
+  el.querySelectorAll("[data-ack-warning]").forEach(b => b.addEventListener("click", async () => {
+    try {
+      await fb.acknowledgeWarning(b.getAttribute("data-ack-warning"));
+      warningsCache = await fb.listWarnings();
+      refreshSidebarBadges();
+      await renderMain();
+    } catch (err) { toast(t("common.error")+err.message, true); }
+  }));
+}
+function warningCardHtml(w, isReceived){
+  const other = isReceived ? w.fromUid : w.toUid;
+  return `<div class="card" style="border-left:3px solid var(--warn);">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="color:var(--warn);">${iconSvg("warn",18)}</span>
+      <div style="font-weight:700;">${escapeHtml(t("warnings.from"))}${escapeHtml(userLabel(other))}</div>
+    </div>
+    <div style="margin-bottom:8px;">${escapeHtml(w.text||"")}</div>
+    <div class="entry-meta">${fmtDateTime(w.createdAt)}</div>
+    ${isReceived
+      ? (w.acknowledged ? `<div class="pill pill-none" style="margin-top:8px;">${escapeHtml(t("warnings.acked"))}</div>` : `<button class="btn btn-sm" style="margin-top:8px;" data-ack-warning="${w.id}">${escapeHtml(t("warnings.ack"))}</button>`)
+      : (w.acknowledged ? `<div class="pill pill-good" style="margin-top:8px;">${escapeHtml(t("warnings.acked"))}</div>` : "")}
   </div>`;
 }
 
@@ -944,10 +1086,72 @@ async function renderProfileView(el){
 }
 
 /* ============================================================
+   RESULTS VIEW (executive dashboard — everyone can see it)
+   ============================================================ */
+async function renderResultsView(el){
+  await ensureMonthLoaded(entriesMonth);
+  await ensureHistoryLoaded();
+  const histMonths = lastNMonths(6);
+  const histLabels = histMonths.map(m => monthShort(parseInt(m.split("-")[1],10)-1) + " " + m.split("-")[0].slice(2));
+
+  const allGoals = structure.flatMap(c => c.goals);
+  const okThisMonth = allGoals.filter(g => goalCheck(g, entriesMonth) === "ok").length;
+  const overallPct = allGoals.length ? okThisMonth / allGoals.length : null;
+
+  const catRows = structure.map(cat => {
+    const ok = cat.goals.filter(g => goalCheck(g, entriesMonth) === "ok").length;
+    return { label: catName(cat), value: cat.goals.length ? ok/cat.goals.length : 0, sub: `${ok}/${cat.goals.length}` };
+  });
+
+  const trendPoints = histMonths.map((m,i) => {
+    const known = allGoals.map(g => goalOkForMonth(g, m)).filter(v => v !== null);
+    const v = known.length ? known.filter(Boolean).length / known.length : null;
+    return { v, label: histLabels[i] };
+  });
+  const hasTrendData = trendPoints.some(p => p.v !== null);
+
+  const pendingCount = pendingApprovalCountAll();
+  const overdueCount = (actionsCache||[]).filter(a => a.status==="open" && daysUntil(a.deadline) < 0).length;
+
+  el.innerHTML = `
+    <div class="page-header"><div><div class="page-title">${escapeHtml(t("results.title"))}</div><div class="page-sub">${escapeHtml(t("results.sub"))}</div></div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:16px;">
+      <div class="card" style="display:flex;align-items:center;gap:14px;">
+        ${donutSvg(overallPct, {size:72, stroke:8})}
+        <div><div style="font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(t("results.goalsMet"))}</div>
+        <div style="font-size:20px;font-weight:800;">${okThisMonth}/${allGoals.length}</div></div>
+      </div>
+      <div class="card">
+        <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(t("results.pendingApprovals"))}</div>
+        <div style="font-size:28px;font-weight:800;margin-top:6px;">${pendingCount}</div>
+      </div>
+      <div class="card">
+        <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(t("results.overdueActions"))}</div>
+        <div style="font-size:28px;font-weight:800;margin-top:6px;color:${overdueCount>0?'var(--bad)':'var(--ink)'};">${overdueCount}</div>
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));">
+      <div class="card">
+        <h3 style="margin-bottom:14px;">${escapeHtml(t("results.byCategory"))}</h3>
+        ${hBarChartSvg(catRows, {width:420})}
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px;">${escapeHtml(t("results.trend"))}</h3>
+        ${hasTrendData ? lineChartSvg(trendPoints, {width:460, height:150}) : `<div class="empty-state">${escapeHtml(t("results.noHistory"))}</div>`}
+      </div>
+    </div>`;
+}
+function pendingApprovalCountAll(){
+  const list = entriesCache[entriesMonth] || [];
+  return list.filter(e => ["submitted","goal_approved","responsible_approved"].includes(e.status)).length;
+}
+
+/* ============================================================
    BOARD VIEW
    ============================================================ */
 async function renderBoardView(el){
   await ensureMonthLoaded(entriesMonth);
+  await ensureHistoryLoaded();
   const cat = findCat(activeCategoryId) || structure[0];
   el.innerHTML = `
     <div class="page-header">
@@ -981,19 +1185,29 @@ function catDetailHtml(cat){
     <h2 style="font-size:20px;font-weight:800;">${escapeHtml(catName(cat))}</h2>
     <span style="font-size:12.5px;color:var(--muted);">${escapeHtml(t("board.goalOwner"))}${escapeHtml(ownerName)}</span>
   </div><div class="goals">`;
+  const histMonths = lastNMonths(6);
+  const histLabels = histMonths.map(m => monthShort(parseInt(m.split("-")[1],10)-1) + " " + m.split("-")[0].slice(2));
   cat.goals.forEach((goal, gi) => {
     const check = goalCheck(goal, entriesMonth);
+    const trendFrac = goalOkFraction(goal, histMonths);
     html += `<div class="goal-card"><div class="goal-head">
       <span class="goal-num mono">${gi+1}</span>
       <div class="goal-title">${goal.title ? escapeHtml(goal.title) : `<span style="color:var(--faint);font-weight:500;">${escapeHtml(t("board.goalNotEntered"))}</span>`}</div>
       <span class="check-badge" data-s="${check==='ok'?'ok':check==='no'?'no':''}">${check==='ok'?'O':check==='no'?'X':'&ndash;'}</span>
-    </div><div class="elements">`;
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:2px 0 4px;">
+      ${donutSvg(trendFrac, {size:52, stroke:6})}
+      <div style="font-size:11px;color:var(--muted);line-height:1.4;">${escapeHtml(t("board.trend"))}</div>
+    </div>
+    <div class="elements">`;
     goal.elements.forEach(elm => {
       const d = elDisplay(elm, entriesMonth);
+      const strip = statusStripSvg(histMonths.map(m => elStatusForMonth(elm, m)), histLabels);
       html += `<div class="el-row" style="grid-template-columns:1fr auto;">
         <div><div class="el-name">${elm.direction==='up'?'&#8593;':'&#8595;'} ${elm.name?escapeHtml(elm.name):`<span style="color:var(--faint);">${escapeHtml(t("board.elementNotEntered"))}</span>`}</div>
           ${elm.unit?`<div class="el-unit">${escapeHtml(elm.unit)}</div>`:""}
           <div style="margin-top:3px;">${d.entry ? `<span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>` : `<span class="pill pill-none">${escapeHtml(t("board.noData"))}</span>`}</div>
+          <div style="margin-top:6px;">${strip}</div>
         </div>
         <div class="el-values">
           <span class="fact mono" data-s="${d.status}">${d.fact!==null&&d.fact!==undefined?d.fact:'&mdash;'}</span>
