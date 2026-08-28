@@ -15,6 +15,37 @@
   --radius: 10px;
   --header-bg:#0e2035; --header-text:#f3f6fa; --header-muted:#aab8ce;
 }
+/* Dark palette: applied when the OS prefers dark AND the user hasn't chosen
+   "light" explicitly, or whenever the user has explicitly chosen "dark". The
+   dark colors are defined once and reused by both selectors below.
+   --header-* stay identical in both themes on purpose (sidebar/login header
+   is always dark) — never override them here. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e8edf5; --muted:#9aa7bb; --faint:#6b7890;
+    --paper:#0b1220; --surface:#141d2e; --surface-2:#1b2537;
+    --border:#2a3550; --border-soft:#232d44;
+    --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a;
+    --warm:#e0973f; --warm-soft:#3a2c17;
+    --good:#4caf7d; --good-soft:#16301f;
+    --warn:#d9a53e; --warn-soft:#3a2f12;
+    --bad:#e2685a; --bad-soft:#3a1a16;
+    --none:#7c879c; --none-soft:#1f2738;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px -12px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e8edf5; --muted:#9aa7bb; --faint:#6b7890;
+  --paper:#0b1220; --surface:#141d2e; --surface-2:#1b2537;
+  --border:#2a3550; --border-soft:#232d44;
+  --accent:#5b8fd6; --accent-ink:#ffffff; --accent-soft:#1d2c47; --accent-dim:#3f5b8a;
+  --warm:#e0973f; --warm-soft:#3a2c17;
+  --good:#4caf7d; --good-soft:#16301f;
+  --warn:#d9a53e; --warn-soft:#3a2f12;
+  --bad:#e2685a; --bad-soft:#3a1a16;
+  --none:#7c879c; --none-soft:#1f2738;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px -12px rgba(0,0,0,.55);
+}
 
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;height:100%;}
@@ -58,6 +89,18 @@ a{color:var(--accent);}
 .lang-switch-light button{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; letter-spacing:.03em; }
 .lang-switch-light button:hover{ border-color:var(--accent-dim); color:var(--ink); }
 .lang-switch-light button.active{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-dim); }
+
+.theme-toggle-btn{ background:transparent; border:1px solid rgba(255,255,255,.22); color:var(--header-muted); border-radius:7px; padding:5px 7px; display:inline-flex; align-items:center; justify-content:center; }
+.theme-toggle-btn:hover{ color:#fff; border-color:rgba(255,255,255,.45); }
+.theme-toggle-btn-light{ background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:7px; padding:5px 7px; display:inline-flex; align-items:center; justify-content:center; }
+.theme-toggle-btn-light:hover{ border-color:var(--accent-dim); color:var(--ink); }
+.topbar-row{ display:flex; align-items:center; justify-content:center; gap:6px; }
+.sidebar .topbar-row{ justify-content:flex-start; margin:2px 8px 12px; }
+
+/* ---------------- archive (yearly history grid) ---------------- */
+.archive-table{ width:100%; border-collapse:separate; border-spacing:0 8px; }
+.archive-table td{ vertical-align:middle; padding:4px 8px; }
+.archive-goal-label{ font-size:12.5px; font-weight:600; color:var(--ink); max-width:260px; }
 
 .login-eyebrow{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent-dim); font-weight:600; text-align:center;}
 .login-title{font-size:21px; font-weight:800; text-align:center;}
