@@ -78,6 +78,59 @@ export function compressImageFile(file, maxDim, quality){
   });
 }
 
+/* ---------------- theme (light/dark) ---------------- */
+const THEME_KEY = "bpd_theme";
+export function getTheme(){
+  try { const v = localStorage.getItem(THEME_KEY); if (v==="light"||v==="dark") return v; } catch (e) { /* ignore */ }
+  return null; // null = follow OS preference
+}
+export function setTheme(v){
+  try {
+    if (v === "light" || v === "dark") { localStorage.setItem(THEME_KEY, v); document.documentElement.setAttribute("data-theme", v); }
+    else { localStorage.removeItem(THEME_KEY); document.documentElement.removeAttribute("data-theme"); }
+  } catch (e) { /* ignore */ }
+}
+export function effectiveTheme(){
+  const stored = getTheme();
+  if (stored) return stored;
+  try { return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
+  catch (e) { return "light"; }
+}
+
+/* ---------------- CSV export ---------------- */
+export function csvCell(v){
+  const s = v==null ? "" : String(v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+export function downloadCsv(filename, rows){
+  const csv = "﻿" + rows.map(r => r.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+// Oddiy CSV qator parseri (qo'shtirnoq ichidagi vergullarni to'g'ri o'qiydi).
+export function parseCsv(text){
+  const rows = []; let row = [], cell = "", inQuotes = false;
+  const s = text.replace(/\r\n/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQuotes) {
+      if (c === '"') { if (s[i+1] === '"') { cell += '"'; i++; } else inQuotes = false; }
+      else cell += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(cell); cell = ""; }
+      else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += c;
+    }
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r[0] && r[0].trim() !== ""));
+}
+
 let toastTimer = null;
 export function toast(msg, isErr){
   let el = document.getElementById("toast");
@@ -106,7 +159,13 @@ export const ICONS = {
   check: '<path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   bell: '<path d="M6 10a6 6 0 0112 0c0 4 1.5 5.5 1.5 5.5h-15S6 14 6 10z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 18.5a2 2 0 004 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
   warn: '<path d="M12 3.5 21 19.5H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="12" y1="9.5" x2="12" y2="14.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/>',
-  chart: '<rect x="4" y="13" width="3.4" height="7" rx="1" fill="currentColor"/><rect x="10.3" y="8.3" width="3.4" height="11.7" rx="1" fill="currentColor"/><rect x="16.6" y="4.3" width="3.4" height="15.7" rx="1" fill="currentColor"/>'
+  chart: '<rect x="4" y="13" width="3.4" height="7" rx="1" fill="currentColor"/><rect x="10.3" y="8.3" width="3.4" height="11.7" rx="1" fill="currentColor"/><rect x="16.6" y="4.3" width="3.4" height="15.7" rx="1" fill="currentColor"/>',
+  sun: '<circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="12" y1="2.3" x2="12" y2="4.8"/><line x1="12" y1="19.2" x2="12" y2="21.7"/><line x1="2.3" y1="12" x2="4.8" y2="12"/><line x1="19.2" y1="12" x2="21.7" y2="12"/><line x1="4.9" y1="4.9" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19.1" y2="4.9"/></g>',
+  moon: '<path d="M20 14.2a8.4 8.4 0 01-10.7-10.6 8.4 8.4 0 1010.7 10.6z" fill="currentColor"/>',
+  archive: '<rect x="3.5" y="4.5" width="17" height="4.2" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 8.7v9a1.6 1.6 0 001.6 1.6h11.8a1.6 1.6 0 001.6-1.6v-9" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="12.2" x2="14" y2="12.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  download: '<path d="M12 3.5v11.5M7.5 11l4.5 4.5L16.5 11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.5" y1="19.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  print: '<rect x="5" y="8.5" width="14" height="7.5" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 8.5V4.5h10v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="7.5" y="13" width="9" height="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  upload: '<path d="M12 16.5V5M7.5 9l4.5-4.5L16.5 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.5" y1="19.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
 };
 export function iconSvg(name, size){
   size = size || 16;
