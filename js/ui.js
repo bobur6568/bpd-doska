@@ -315,13 +315,58 @@ function refreshSidebarBadges(){
 /* ============================================================
    STATUS / COMPUTATION HELPERS (shared with board + approvals)
    ============================================================ */
+// Reja/fakt taqqoslash yo'nalishi. Eski ma'lumotlarda faqat "up"/"down" bo'lgan —
+// ular endi "gte"/"lte" bilan bir xil ma'noda ishlaydi (orqaga moslik uchun).
+function normDirection(direction){
+  if (direction === "up") return "gte";
+  if (direction === "down" || !direction) return "lte";
+  return direction; // gte | gt | eq | lte | lt
+}
+const DIRECTION_TYPES = ["gte","gt","eq","lte","lt"];
+function directionLabel(direction){
+  return t("structure.direction." + normDirection(direction));
+}
+function directionSymbolHtml(direction){
+  const sym = { gte:"&#8805;", gt:"&gt;", eq:"=", lte:"&#8804;", lt:"&lt;" };
+  return sym[normDirection(direction)] || sym.lte;
+}
+function directionOptionsHtml(current){
+  const d = normDirection(current);
+  return DIRECTION_TYPES.map(v => `<option value="${v}" ${d===v?"selected":""}>${escapeHtml(t("structure.direction."+v))}</option>`).join("");
+}
 function computeStatus(plan, fact, direction){
   if (plan===undefined||plan===null||plan==="") return "none";
   if (fact===undefined||fact===null||fact==="") return "none";
   plan = Number(plan); fact = Number(fact);
   if (isNaN(plan)||isNaN(fact)) return "none";
-  if (direction === "up") { if (fact>=plan) return "good"; if (fact>=plan*0.85) return "warn"; return "bad"; }
-  return fact<=plan ? "good" : (fact<=plan*1.15 ? "warn" : "bad");
+  const d = normDirection(direction);
+  if (d === "gte") { if (fact>=plan) return "good"; if (fact>=plan*0.85) return "warn"; return "bad"; }
+  if (d === "gt")  { if (fact>plan) return "good"; if (fact>=plan*0.85) return "warn"; return "bad"; }
+  if (d === "eq")  { if (fact===plan) return "good"; const tol = Math.abs(plan)*0.05; return Math.abs(fact-plan)<=tol ? "warn" : "bad"; }
+  if (d === "lt")  { if (fact<plan) return "good"; if (fact<=plan*1.15) return "warn"; return "bad"; }
+  return fact<=plan ? "good" : (fact<=plan*1.15 ? "warn" : "bad"); // lte
+}
+// Nom maydonida "O'zbekcha / English" yoki "O'zbekcha (English)" shaklida kiritilgan
+// bo'lsa, ingliz qismini avtomatik aniqlab boshqacha uslub (kursiv/kulrang) bilan chiqaradi.
+function splitNameLang(text){
+  if (!text) return null;
+  const slashIdx = text.indexOf("/");
+  if (slashIdx > -1) {
+    const primary = text.slice(0, slashIdx).trim();
+    const secondary = text.slice(slashIdx+1).trim();
+    if (primary && secondary) return { primary, secondary, wrap:false };
+  }
+  const m = text.match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
+  if (m && m[1].trim() && m[2].trim()) return { primary: m[1].trim(), secondary: m[2].trim(), wrap:true };
+  return null;
+}
+function nameLangHtml(text){
+  if (!text) return "";
+  const parts = splitNameLang(text);
+  if (!parts) return escapeHtml(text);
+  return parts.wrap
+    ? `${escapeHtml(parts.primary)} <span class="name-en">(${escapeHtml(parts.secondary)})</span>`
+    : `${escapeHtml(parts.primary)} <span class="name-en">/ ${escapeHtml(parts.secondary)}</span>`;
 }
 function findEntry(list, elementId, month){
   return (list||[]).find(e => e.elementId === elementId) || null;
@@ -463,8 +508,8 @@ function entryCardHtml(it){
   const locked = d.entry && d.entry.status === "locked";
   const planVal = (it.el.plan && it.el.plan[entriesMonth] !== undefined && it.el.plan[entriesMonth] !== null) ? it.el.plan[entriesMonth] : null;
   return `<div class="card" data-entry-card="${it.el.id}">
-    <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">${escapeHtml(catName(it.cat))} &rsaquo; ${escapeHtml(it.goal.title||t("entry.unnamedGoal"))}</div>
-    <div style="font-weight:700;margin-bottom:8px;">${escapeHtml(it.el.name || t("entry.unnamedElement"))} ${it.el.unit?`<span style="color:var(--muted);font-weight:500;">(${escapeHtml(it.el.unit)})</span>`:""}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">${escapeHtml(catName(it.cat))} &rsaquo; ${it.goal.title?nameLangHtml(it.goal.title):escapeHtml(t("entry.unnamedGoal"))}</div>
+    <div style="font-weight:700;margin-bottom:8px;">${it.el.name?nameLangHtml(it.el.name):escapeHtml(t("entry.unnamedElement"))} ${it.el.unit?`<span style="color:var(--muted);font-weight:500;">(${escapeHtml(it.el.unit)})</span>`:""}</div>
     ${d.entry ? `<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;"><span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>${perfBadgeHtml(d.perfStatus)}</div>` : ""}
     ${d.entry && (d.entry.status==='goal_rejected'||d.entry.status==='responsible_rejected'||d.entry.status==='owner_rejected') && d.entry[d.entry.status.replace('_rejected','Review')]?.comment ?
       `<div class="reject-reason">${escapeHtml(t("entry.reason"))}${escapeHtml(d.entry[d.entry.status.replace('_rejected','Review')].comment)}</div>` : ""}
@@ -559,7 +604,7 @@ async function renderAnnualPlanView(el){
       </div>
     </div>
     ${cat.goals.map(goal => `
-      <h3 style="font-size:14.5px;font-weight:800;margin:18px 0 8px;">${escapeHtml(goal.title||t("entry.unnamedGoal"))}</h3>
+      <h3 style="font-size:14.5px;font-weight:800;margin:18px 0 8px;">${goal.title?nameLangHtml(goal.title):escapeHtml(t("entry.unnamedGoal"))}</h3>
       <div class="table-wrap" style="margin-bottom:14px;"><table class="data-table plan-table">
         <thead><tr>
           <th style="text-align:left;">${escapeHtml(t("annualPlan.thElement"))}</th>
@@ -568,7 +613,7 @@ async function renderAnnualPlanView(el){
         </tr></thead>
         <tbody>${goal.elements.map(elm => `
           <tr data-plan-row="${elm.id}" data-goal="${goal.id}">
-            <td style="text-align:left;min-width:150px;">${escapeHtml(elm.name||t("entry.unnamedElement"))}${elm.unit?` <span class="entry-meta">(${escapeHtml(elm.unit)})</span>`:""}</td>
+            <td style="text-align:left;min-width:150px;">${elm.name?nameLangHtml(elm.name):escapeHtml(t("entry.unnamedElement"))}${elm.unit?` <span class="entry-meta">(${escapeHtml(elm.unit)})</span>`:""}</td>
             ${months.map(m => `<td><input type="number" step="any" class="plan-month-input mono" data-month="${m}" style="width:64px;text-align:center;padding:6px 4px;" value="${elm.plan&&elm.plan[m]!==undefined&&elm.plan[m]!==null?elm.plan[m]:''}"></td>`).join("")}
             <td><button class="btn btn-sm btn-primary plan-save-btn">${escapeHtml(t("annualPlan.save"))}</button></td>
           </tr>`).join("")}</tbody>
@@ -620,7 +665,7 @@ async function renderApprovalsView(el){
 }
 function approvalCardHtml(entry){
   const path = findElementPath(entry.elementId);
-  const title = path ? `${escapeHtml(catName(path.cat))} &rsaquo; ${escapeHtml(path.el.name||t("approvals.element"))}` : escapeHtml(t("approvals.element"));
+  const title = path ? `${escapeHtml(catName(path.cat))} &rsaquo; ${path.el.name?nameLangHtml(path.el.name):escapeHtml(t("approvals.element"))}` : escapeHtml(t("approvals.element"));
   const perfStatus = path ? computeStatus(entry.plan, entry.fact, path.el.direction) : "none";
   return `<div class="entry-card" data-approval="${entry.id}">
     <div class="entry-head">
@@ -960,10 +1005,7 @@ async function renderAssignmentsView(el){
             <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><div style="display:flex;gap:6px;"><input class="el-name-input" style="flex:1;min-width:0;" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
             <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
             <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
-              <select class="el-direction-input">
-                <option value="down" ${elm.direction!=="up"?"selected":""}>${escapeHtml(t("structure.directionDown"))}</option>
-                <option value="up" ${elm.direction==="up"?"selected":""}>${escapeHtml(t("structure.directionUp"))}</option>
-              </select>
+              <select class="el-direction-input">${directionOptionsHtml(elm.direction)}</select>
             </div>
             <button class="btn btn-sm el-name-save" style="margin-bottom:10px;">${escapeHtml(t("structure.saveName"))}</button>
             <div class="field"><label>${escapeHtml(t("assign.elementOwner"))}</label>
@@ -1036,10 +1078,7 @@ async function renderStructureView(el){
             <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><div style="display:flex;gap:6px;"><input class="el-name-input" style="flex:1;min-width:0;" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
             <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
             <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
-              <select class="el-direction-input">
-                <option value="down" ${elm.direction!=="up"?"selected":""}>${escapeHtml(t("structure.directionDown"))}</option>
-                <option value="up" ${elm.direction==="up"?"selected":""}>${escapeHtml(t("structure.directionUp"))}</option>
-              </select>
+              <select class="el-direction-input">${directionOptionsHtml(elm.direction)}</select>
             </div>
             <button class="btn btn-primary btn-sm el-name-save" style="margin-top:8px;">${escapeHtml(t("structure.saveName"))}</button>
           </div>`).join("")}</div>
@@ -1498,7 +1537,7 @@ function archiveDetailHtml(cat, monthsArr, monthLabels, cache, hasAny){
     });
     rows += `<tr>
       <td class="mono" style="color:var(--muted);">${gi+1}</td>
-      <td class="archive-goal-label">${escapeHtml(goal.title || t("assign.unnamedGoal"))}</td>
+      <td class="archive-goal-label">${goal.title?nameLangHtml(goal.title):escapeHtml(t("assign.unnamedGoal"))}</td>
       <td>${statusStripSvg(statuses, monthLabels, {cell:16,gap:4})}</td>
     </tr>`;
   });
@@ -1560,7 +1599,7 @@ function catDetailHtml(cat){
     const trendFrac = goalOkFraction(goal, histMonths);
     html += `<div class="goal-card"><div class="goal-head">
       <span class="goal-num mono">${gi+1}</span>
-      <div class="goal-title">${goal.title ? escapeHtml(goal.title) : `<span style="color:var(--faint);font-weight:500;">${escapeHtml(t("board.goalNotEntered"))}</span>`}</div>
+      <div class="goal-title">${goal.title ? nameLangHtml(goal.title) : `<span style="color:var(--faint);font-weight:500;">${escapeHtml(t("board.goalNotEntered"))}</span>`}</div>
       <span class="check-badge" data-s="${check==='ok'?'ok':check==='no'?'no':''}">${check==='ok'?'O':check==='no'?'X':'&ndash;'}</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;padding:2px 0 4px;">
@@ -1572,7 +1611,7 @@ function catDetailHtml(cat){
       const d = elDisplay(elm, entriesMonth);
       const strip = statusStripSvg(histMonths.map(m => elStatusForMonth(elm, m)), histLabels);
       html += `<div class="el-row" style="grid-template-columns:1fr auto;">
-        <div><div class="el-name">${elm.direction==='up'?'&#8593;':'&#8595;'} ${elm.name?escapeHtml(elm.name):`<span style="color:var(--faint);">${escapeHtml(t("board.elementNotEntered"))}</span>`}</div>
+        <div><div class="el-name" title="${escapeHtml(directionLabel(elm.direction))}"><span class="dir-arrow mono">${directionSymbolHtml(elm.direction)}</span> ${elm.name?nameLangHtml(elm.name):`<span style="color:var(--faint);">${escapeHtml(t("board.elementNotEntered"))}</span>`}</div>
           ${elm.unit?`<div class="el-unit">${escapeHtml(elm.unit)}</div>`:""}
           <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap;">${d.entry ? `<span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>${perfBadgeHtml(d.perfStatus)}` : `<span class="pill pill-none">${escapeHtml(t("board.noData"))}</span>`}</div>
           <div style="margin-top:6px;">${strip}</div>
