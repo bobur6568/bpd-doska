@@ -1,0 +1,174 @@
+rules_version = '2';
+
+// =====================================================================
+// BPD Doskasi — Firestore Security Rules
+//
+// Roles (stored on /users/{uid}.role):
+//   admin        - tizim yaratuvchisi: foydalanuvchi yaratadi/rol beradi
+//   boardOwner   - doska egasi (direktor), 1 ta: responsible'ni belgilaydi,
+//                  yakuniy tasdiq beradi (shundan keyin yozuv qulflanadi)
+//   responsible  - doska bo'yicha mas'ul (boshqarma boshlig'i), 1 ta:
+//                  goalOwner'larni belgilaydi, 2-bosqich tasdiq beradi
+//   goalOwner    - maqsad egasi / bo'lim boshlig'i, 6 ta (1 ta / kategoriya):
+//                  elementOwner'larni belgilaydi, 1-bosqich tasdiq beradi
+//   elementOwner - element egasi / bo'linma boshlig'i, 19 ta:
+//                  oylik reja/fakt ma'lumotini kiritadi
+//
+// Data ega bo'lish zanjiri: element -> goal -> category
+// Tasdiq zanjiri: submitted -> goal_approved -> responsible_approved -> locked
+// Har qanday bosqichda rad etilsa -> elementOwner qayta tahrirlaydi -> qaytadan boshidan.
+// locked = true bo'lgach hech kim (admin ham) o'zgartira olmaydi.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function myRole() { return signedIn() ? me().role : null; }
+    function isAdmin() { return myRole() == 'admin'; }
+    function isBoardOwner() { return myRole() == 'boardOwner'; }
+    function isResponsible() { return myRole() == 'responsible'; }
+    function isGoalOwner() { return myRole() == 'goalOwner'; }
+    function isElementOwner() { return myRole() == 'elementOwner'; }
+    function isActive() { return signedIn() && me().active == true; }
+
+    function category(catId) {
+      return get(/databases/$(database)/documents/structure_categories/$(catId)).data;
+    }
+    function isGoalOwnerOfCategory(catId) {
+      return isGoalOwner() && isActive() && category(catId).goalOwnerUid == request.auth.uid;
+    }
+    // Element egaligi faqat struktura hujjatida saqlanadi (yagona haqiqat
+    // manbai) — foydalanuvchi hujjatida nusxa saqlanmaydi, shu sabab bu yerda
+    // to'g'ridan-to'g'ri element hujjatini o'qib tekshiramiz.
+    function isElementOwnerOfElement(catId, goalId, elId) {
+      return isElementOwner() && isActive() &&
+        get(/databases/$(database)/documents/structure_categories/$(catId)/goals/$(goalId)/elements/$(elId)).data.elementOwnerUid == request.auth.uid;
+    }
+    function threeMonthsPassed(prevTs) {
+      return prevTs == null || request.time > (prevTs + duration.value(90, 'd'));
+    }
+
+    // ---------------- users ----------------
+    // Only admin creates/edits accounts (incl. role & assignment fields on user doc).
+    // A signed-in user may read the user directory (needed for names/photos on the
+    // board and approval screens) and update a narrow set of their own fields.
+    match /users/{uid} {
+      allow read: if isActive() || isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (signedIn() && request.auth.uid == uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['fullName','workplace','position','photo','lastLoginAt']) &&
+         request.resource.data.role == resource.data.role);
+    }
+
+    // ---------------- global settings (board owner -> responsible) ----------------
+    match /settings/{docId} {
+      allow read: if isActive();
+      allow write: if isAdmin() || (
+        isBoardOwner() && isActive() && docId == 'assignments' &&
+        threeMonthsPassed(resource == null ? null : resource.data.responsibleNextChangeAt)
+      );
+    }
+
+    // ---------------- structure: categories / goals / elements ----------------
+    match /structure_categories/{catId} {
+      allow read: if isActive();
+      // Only responsible (or admin) assigns/changes a category's goalOwner,
+      // and only after the quarterly cooldown has passed.
+      allow update: if isAdmin() || (
+        isResponsible() && isActive() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['goalOwnerUid','goalOwnerAssignedAt','goalOwnerNextChangeAt']) &&
+        threeMonthsPassed(resource.data.goalOwnerNextChangeAt)
+      );
+      allow create: if isAdmin();
+
+      match /goals/{goalId} {
+        allow read: if isActive();
+        allow write: if isAdmin() || isGoalOwnerOfCategory(catId) || isResponsible() || isBoardOwner();
+
+        match /elements/{elId} {
+          allow read: if isActive();
+          // Element metadata (name/unit/direction) edited by the goal owner who
+          // supervises that category, or admin.
+          allow update: if isAdmin() || (
+            isGoalOwnerOfCategory(catId) &&
+            (
+              // editing metadata
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['name','unit','direction','order']) ||
+              // reassigning the element owner, respecting the quarterly cooldown
+              (request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['elementOwnerUid','elementOwnerAssignedAt','elementOwnerNextChangeAt']) &&
+               threeMonthsPassed(resource.data.elementOwnerNextChangeAt))
+            )
+          );
+          allow create, delete: if isAdmin() || isGoalOwnerOfCategory(catId);
+        }
+      }
+    }
+
+    // ---------------- monthly entries (plan/fact + approval chain) ----------------
+    match /entries/{entryId} {
+      allow read: if isActive();
+
+      allow create: if isActive() && isElementOwner() &&
+        request.resource.data.enteredBy == request.auth.uid &&
+        isElementOwnerOfElement(request.resource.data.categoryId, request.resource.data.goalId, request.resource.data.elementId) &&
+        request.resource.data.status == 'submitted';
+
+      allow update: if isActive() && resource.data.status != 'locked' && (
+        // element owner corrects & resubmits after a rejection
+        (isElementOwnerOfElement(resource.data.categoryId, resource.data.goalId, resource.data.elementId) &&
+         resource.data.status in ['submitted','goal_rejected','responsible_rejected','owner_rejected'] &&
+         request.resource.data.status == 'submitted' &&
+         request.resource.data.enteredBy == request.auth.uid)
+        ||
+        // goal owner reviews a submitted entry
+        (isGoalOwnerOfCategory(resource.data.categoryId) &&
+         resource.data.status == 'submitted' &&
+         request.resource.data.status in ['goal_approved','goal_rejected'])
+        ||
+        // responsible reviews a goal-approved entry
+        (isResponsible() &&
+         resource.data.status == 'goal_approved' &&
+         request.resource.data.status in ['responsible_approved','responsible_rejected'])
+        ||
+        // board owner gives final approval (locks) or rejects
+        (isBoardOwner() &&
+         resource.data.status == 'responsible_approved' &&
+         request.resource.data.status in ['locked','owner_rejected'])
+        ||
+        isAdmin()
+      );
+
+      allow delete: if false; // audit trail: never hard-delete an entry
+
+      match /history/{histId} {
+        allow read: if isActive();
+        allow create: if isActive(); // append-only snapshot before each resubmission
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------------- chora-tadbir actions & deadlines ----------------
+    match /actions/{actionId} {
+      allow read: if isActive();
+      allow create: if isActive() && (
+        (request.resource.data.scope == 'element' && isGoalOwnerOfCategory(request.resource.data.categoryId)) ||
+        (request.resource.data.scope == 'goal' && isResponsible())
+      ) && request.resource.data.setBy == request.auth.uid;
+      allow update: if isActive() && (
+        isAdmin() ||
+        resource.data.setBy == request.auth.uid ||
+        (resource.data.assignedTo == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status','doneAt','doneBy'])) // assignee may only mark done
+      );
+      allow delete: if isAdmin() || (isActive() && resource.data.setBy == request.auth.uid);
+    }
+  }
+}
