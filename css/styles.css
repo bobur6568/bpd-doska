@@ -49,6 +49,16 @@ a{color:var(--accent);}
   width:100%; max-width:380px; background:var(--surface); border-radius:14px; box-shadow:var(--shadow);
   padding:28px 26px; display:flex; flex-direction:column; gap:16px;
 }
+.lang-switch{ display:flex; gap:3px; }
+.lang-switch button{ background:transparent; border:1px solid rgba(255,255,255,.22); color:var(--header-muted); font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; letter-spacing:.03em; }
+.lang-switch button:hover{ color:#fff; border-color:rgba(255,255,255,.45); }
+.lang-switch button.active{ background:rgba(255,255,255,.14); color:#fff; }
+.sidebar .lang-switch{ margin:2px 8px 12px; }
+.lang-switch-light{ display:flex; gap:3px; justify-content:center; margin-bottom:-4px; }
+.lang-switch-light button{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; letter-spacing:.03em; }
+.lang-switch-light button:hover{ border-color:var(--accent-dim); color:var(--ink); }
+.lang-switch-light button.active{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-dim); }
+
 .login-eyebrow{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent-dim); font-weight:600; text-align:center;}
 .login-title{font-size:21px; font-weight:800; text-align:center;}
 .login-sub{font-size:12.5px; color:var(--muted); text-align:center; margin-top:-8px;}
