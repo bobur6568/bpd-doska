@@ -1,17 +1,9 @@
 // =====================================================================
 // BPD Doskasi — umumiy yordamchi funksiyalar
 // =====================================================================
+import { monthName, localeCode, t } from "./i18n.js";
 
-export const MONTHS_UZ = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentyabr","Oktyabr","Noyabr","Dekabr"];
 export const MM = ["01","02","03","04","05","06","07","08","09","10","11","12"];
-
-export const ROLE_LABEL = {
-  admin: "Admin",
-  boardOwner: "Doska egasi",
-  responsible: "Doska bo'yicha mas'ul",
-  goalOwner: "Maqsad egasi",
-  elementOwner: "Element egasi"
-};
 
 export function escapeHtml(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -23,7 +15,7 @@ export function currentMonth(){
 }
 export function monthYear(ym){
   const [y,m] = ym.split("-");
-  return MONTHS_UZ[parseInt(m,10)-1] + " " + y;
+  return monthName(parseInt(m,10)-1) + " " + y;
 }
 export function shiftMonth(ym, delta){
   let [y,m] = ym.split("-").map(Number); m -= 1; m += delta;
@@ -34,12 +26,12 @@ export function shiftMonth(ym, delta){
 export function fmtDateTime(tsOrDate){
   if (!tsOrDate) return "";
   const d = tsOrDate.toDate ? tsOrDate.toDate() : new Date(tsOrDate);
-  return d.toLocaleString("uz-UZ", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  return d.toLocaleString(localeCode(), { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 export function fmtDate(dateStr){
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("uz-UZ", { day:"2-digit", month:"2-digit", year:"numeric" });
+  return d.toLocaleDateString(localeCode(), { day:"2-digit", month:"2-digit", year:"numeric" });
 }
 export function todayStr(){
   const d = new Date();
@@ -57,12 +49,12 @@ export function compressImageFile(file, maxDim, quality){
   maxDim = maxDim || 1000; quality = quality || 0.62;
   return new Promise((resolve, reject) => {
     if (!file) { resolve(null); return; }
-    if (!file.type || !file.type.startsWith("image/")) { reject(new Error("Fayl rasm emas")); return; }
+    if (!file.type || !file.type.startsWith("image/")) { reject(new Error(t("err.notImage"))); return; }
     const img = new Image();
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Faylni o'qib bo'lmadi"));
+    reader.onerror = () => reject(new Error(t("err.cantReadFile")));
     reader.onload = () => {
-      img.onerror = () => reject(new Error("Rasmni ochib bo'lmadi"));
+      img.onerror = () => reject(new Error(t("err.cantOpenImage")));
       img.onload = () => {
         let w = img.width, h = img.height;
         if (w > h && w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; }
