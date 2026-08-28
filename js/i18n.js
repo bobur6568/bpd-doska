@@ -179,6 +179,9 @@ const S = {
     "structure.directionUp": "Oshishi kerak (yuqori = yaxshi)",
     "structure.saveName": "Nomni saqlash",
     "structure.saved": "Saqlandi",
+    "structure.pasteBtn": "Joylashtirish",
+    "structure.pasteFailed": "Joylashtira olmadik — brauzer ruxsat bermadi. Maydonga bosib, Ctrl+V ni sinab ko'ring yoki brauzer sozlamalarida shu sayt uchun \"Clipboard\" ruxsatini yoqing.",
+    "structure.pasteEmpty": "Almashish buferi bo'sh — avval nomni nusxalab oling (Ctrl+C)",
 
     "shell.loading": "Ma'lumotlar yuklanmoqda...",
     "shell.loadError": "Yuklashda xatolik: ",
@@ -450,6 +453,9 @@ const S = {
     "structure.directionUp": "Should increase (higher = good)",
     "structure.saveName": "Save name",
     "structure.saved": "Saved",
+    "structure.pasteBtn": "Paste",
+    "structure.pasteFailed": "Couldn't paste — the browser denied access. Click the field and try Ctrl+V, or enable the \"Clipboard\" permission for this site in your browser settings.",
+    "structure.pasteEmpty": "Clipboard is empty — copy the name first (Ctrl+C)",
 
     "shell.loading": "Loading data...",
     "shell.loadError": "Loading error: ",
@@ -721,6 +727,9 @@ const S = {
     "structure.directionUp": "Должно увеличиваться (больше = хорошо)",
     "structure.saveName": "Сохранить название",
     "structure.saved": "Сохранено",
+    "structure.pasteBtn": "Вставить",
+    "structure.pasteFailed": "Не удалось вставить — браузер не дал разрешения. Нажмите на поле и попробуйте Ctrl+V, либо включите разрешение \"Буфер обмена\" для этого сайта в настройках браузера.",
+    "structure.pasteEmpty": "Буфер обмена пуст — сначала скопируйте название (Ctrl+C)",
 
     "shell.loading": "Загрузка данных...",
     "shell.loadError": "Ошибка загрузки: ",
