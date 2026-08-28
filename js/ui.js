@@ -101,6 +101,7 @@ function NAV(){
     { id: "actions", label: t("nav.actions"), icon: "link", roles: null },
     { id: "assignments", label: t("nav.assignments"), icon: "users", roles: ["boardOwner","responsible","goalOwner"] },
     { id: "users", label: t("nav.users"), icon: "users", roles: ["admin"] },
+    { id: "structure", label: t("nav.structure"), icon: "target", roles: ["admin"] },
     { id: "profile", label: t("nav.profile"), icon: "people", roles: null }
   ];
 }
@@ -201,6 +202,7 @@ async function renderMain(){
     if (activeView === "actions") return renderActionsView(el);
     if (activeView === "assignments") return renderAssignmentsView(el);
     if (activeView === "users") return renderUsersView(el);
+    if (activeView === "structure") return renderStructureView(el);
     if (activeView === "profile") return renderProfileView(el);
   } catch (err) {
     console.error(err);
@@ -643,11 +645,22 @@ async function renderAssignmentsView(el){
     el.innerHTML = `
       <div class="page-header"><div><div class="page-title">${escapeHtml(t("assign.title"))}</div><div class="page-sub">${escapeHtml(t("assign.sub.elementOwner",{cat:catName(cat)}))}</div></div></div>
       ${cat.goals.map(goal => `
-        <h3 style="margin:16px 0 8px;">${escapeHtml(goal.title || t("assign.unnamedGoal"))}</h3>
+        <div class="card" data-goal-edit="${goal.id}" style="margin:16px 0 8px;display:flex;gap:8px;align-items:flex-end;max-width:560px;">
+          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><input class="goal-title-input" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"></div>
+          <button class="btn btn-sm goal-title-save">${escapeHtml(t("structure.saveName"))}</button>
+        </div>
         <div class="grid grid-cards">${goal.elements.map(elm => {
           const locked = isLocked(elm.elementOwnerNextChangeAt);
           return `<div class="card" data-assign-el="${elm.id}" data-goal="${goal.id}">
-            <div style="font-weight:700;margin-bottom:8px;">${escapeHtml(elm.name || t("assign.unnamedElement"))}</div>
+            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><input class="el-name-input" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
+              <select class="el-direction-input">
+                <option value="down" ${elm.direction!=="up"?"selected":""}>${escapeHtml(t("structure.directionDown"))}</option>
+                <option value="up" ${elm.direction==="up"?"selected":""}>${escapeHtml(t("structure.directionUp"))}</option>
+              </select>
+            </div>
+            <button class="btn btn-sm el-name-save" style="margin-bottom:10px;">${escapeHtml(t("structure.saveName"))}</button>
             <div class="field"><label>${escapeHtml(t("assign.elementOwner"))}</label>
               <select class="assign-elowner-select" ${locked?"disabled":""}>
                 <option value="">${escapeHtml(t("common.notSelected"))}</option>
@@ -659,9 +672,32 @@ async function renderAssignmentsView(el){
           </div>`;
         }).join("")}</div>`).join("")}
       ${candidates.length===0?`<div class="entry-meta" style="margin-top:10px;">${escapeHtml(t("assign.noElementOwnerCandidates"))}</div>`:""}`;
+    el.querySelectorAll("[data-goal-edit]").forEach(card => {
+      const goalId = card.getAttribute("data-goal-edit");
+      card.querySelector(".goal-title-save").addEventListener("click", async () => {
+        const title = card.querySelector(".goal-title-input").value.trim();
+        try {
+          await fb.updateGoalMeta(cat.id, goalId, { title });
+          toast(t("structure.saved"));
+          structure = await fb.getFullStructure();
+          await renderMain();
+        } catch (err) { toast(t("common.error")+err.message, true); }
+      });
+    });
     el.querySelectorAll("[data-assign-el]").forEach(card => {
       const elId = card.getAttribute("data-assign-el");
       const goalId = card.getAttribute("data-goal");
+      card.querySelector(".el-name-save").addEventListener("click", async () => {
+        const name = card.querySelector(".el-name-input").value.trim();
+        const unit = card.querySelector(".el-unit-input").value.trim();
+        const direction = card.querySelector(".el-direction-input").value;
+        try {
+          await fb.updateElementMeta(cat.id, goalId, elId, { name, unit, direction });
+          toast(t("structure.saved"));
+          structure = await fb.getFullStructure();
+          await renderMain();
+        } catch (err) { toast(t("common.error")+err.message, true); }
+      });
       card.querySelector(".assign-elowner-btn").addEventListener("click", async () => {
         const uid = card.querySelector(".assign-elowner-select").value;
         if (!uid) { toast(t("common.selectUser"), true); return; }
@@ -674,6 +710,65 @@ async function renderAssignmentsView(el){
       });
     });
   }
+}
+
+/* ============================================================
+   STRUCTURE VIEW (admin: edit goal/element names for all categories)
+   ============================================================ */
+async function renderStructureView(el){
+  el.innerHTML = `
+    <div class="page-header"><div><div class="page-title">${escapeHtml(t("structure.title"))}</div><div class="page-sub">${escapeHtml(t("structure.sub"))}</div></div></div>
+    ${structure.map(cat => `
+      <h2 style="font-size:16px;font-weight:800;margin:22px 0 10px;display:flex;align-items:center;gap:8px;">${iconSvg(cat.icon)} ${escapeHtml(catName(cat))}</h2>
+      ${cat.goals.map(goal => `
+        <div class="card" data-goal-edit="${goal.id}" data-cat="${cat.id}" style="margin-bottom:10px;display:flex;gap:8px;align-items:flex-end;max-width:560px;">
+          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><input class="goal-title-input" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"></div>
+          <button class="btn btn-sm goal-title-save">${escapeHtml(t("structure.saveName"))}</button>
+        </div>
+        <div class="grid grid-cards" style="margin-bottom:16px;">${goal.elements.map(elm => `
+          <div class="card" data-el-edit="${elm.id}" data-goal="${goal.id}" data-cat="${cat.id}">
+            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><input class="el-name-input" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
+              <select class="el-direction-input">
+                <option value="down" ${elm.direction!=="up"?"selected":""}>${escapeHtml(t("structure.directionDown"))}</option>
+                <option value="up" ${elm.direction==="up"?"selected":""}>${escapeHtml(t("structure.directionUp"))}</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm el-name-save" style="margin-top:8px;">${escapeHtml(t("structure.saveName"))}</button>
+          </div>`).join("")}</div>
+      `).join("")}
+    `).join("")}
+  `;
+  el.querySelectorAll("[data-goal-edit]").forEach(card => {
+    const goalId = card.getAttribute("data-goal-edit");
+    const catId = card.getAttribute("data-cat");
+    card.querySelector(".goal-title-save").addEventListener("click", async () => {
+      const title = card.querySelector(".goal-title-input").value.trim();
+      try {
+        await fb.updateGoalMeta(catId, goalId, { title });
+        toast(t("structure.saved"));
+        structure = await fb.getFullStructure();
+        await renderMain();
+      } catch (err) { toast(t("common.error")+err.message, true); }
+    });
+  });
+  el.querySelectorAll("[data-el-edit]").forEach(card => {
+    const elId = card.getAttribute("data-el-edit");
+    const goalId = card.getAttribute("data-goal");
+    const catId = card.getAttribute("data-cat");
+    card.querySelector(".el-name-save").addEventListener("click", async () => {
+      const name = card.querySelector(".el-name-input").value.trim();
+      const unit = card.querySelector(".el-unit-input").value.trim();
+      const direction = card.querySelector(".el-direction-input").value;
+      try {
+        await fb.updateElementMeta(catId, goalId, elId, { name, unit, direction });
+        toast(t("structure.saved"));
+        structure = await fb.getFullStructure();
+        await renderMain();
+      } catch (err) { toast(t("common.error")+err.message, true); }
+    });
+  });
 }
 
 /* ============================================================
