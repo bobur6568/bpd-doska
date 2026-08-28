@@ -22,6 +22,10 @@
         document.getElementById("boot-text").textContent = _bpdBoot[_bpdLang];
         document.documentElement.lang = _bpdLang;
       }
+      var _bpdTheme = localStorage.getItem("bpd_theme");
+      if (_bpdTheme === "light" || _bpdTheme === "dark") {
+        document.documentElement.setAttribute("data-theme", _bpdTheme);
+      }
     } catch (e) { /* localStorage unavailable */ }
   </script>
   <script type="module" src="js/main.js"></script>
