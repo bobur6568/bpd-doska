@@ -6,7 +6,7 @@ import {
   escapeHtml, currentMonth, monthYear, shiftMonth, fmtDateTime, fmtDate,
   todayStr, daysUntil, compressImageFile, toast, initials, iconSvg,
   lastNMonths, statusStripSvg, donutSvg, hBarChartSvg, lineChartSvg,
-  effectiveTheme, setTheme, downloadCsv, parseCsv
+  effectiveTheme, setTheme, downloadCsv, parseCsv, bindPasteButtons
 } from "./utils.js";
 import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName, monthShort } from "./i18n.js";
 
@@ -814,13 +814,13 @@ async function renderAssignmentsView(el){
       <div class="page-header"><div><div class="page-title">${escapeHtml(t("assign.title"))}</div><div class="page-sub">${escapeHtml(t("assign.sub.elementOwner",{cat:catName(cat)}))}</div></div></div>
       ${cat.goals.map(goal => `
         <div class="card" data-goal-edit="${goal.id}" style="margin:16px 0 8px;display:flex;gap:8px;align-items:flex-end;max-width:560px;">
-          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><input class="goal-title-input" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"></div>
+          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><div style="display:flex;gap:6px;"><input class="goal-title-input" style="flex:1;min-width:0;" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
           <button class="btn btn-sm goal-title-save">${escapeHtml(t("structure.saveName"))}</button>
         </div>
         <div class="grid grid-cards">${goal.elements.map(elm => {
           const locked = isLocked(elm.elementOwnerNextChangeAt);
           return `<div class="card" data-assign-el="${elm.id}" data-goal="${goal.id}">
-            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><input class="el-name-input" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><div style="display:flex;gap:6px;"><input class="el-name-input" style="flex:1;min-width:0;" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
             <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
             <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
               <select class="el-direction-input">
@@ -877,6 +877,7 @@ async function renderAssignmentsView(el){
         } catch (err) { toast(t("common.error")+err.message, true); }
       });
     });
+    bindPasteButtons(el);
   }
 }
 
@@ -890,12 +891,12 @@ async function renderStructureView(el){
       <h2 style="font-size:16px;font-weight:800;margin:22px 0 10px;display:flex;align-items:center;gap:8px;">${iconSvg(cat.icon)} ${escapeHtml(catName(cat))}</h2>
       ${cat.goals.map(goal => `
         <div class="card" data-goal-edit="${goal.id}" data-cat="${cat.id}" style="margin-bottom:10px;display:flex;gap:8px;align-items:flex-end;max-width:560px;">
-          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><input class="goal-title-input" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"></div>
+          <div class="field" style="flex:1;"><label>${escapeHtml(t("structure.goalTitle"))}</label><div style="display:flex;gap:6px;"><input class="goal-title-input" style="flex:1;min-width:0;" value="${escapeHtml(goal.title||"")}" placeholder="${escapeHtml(t("structure.goalTitlePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
           <button class="btn btn-sm goal-title-save">${escapeHtml(t("structure.saveName"))}</button>
         </div>
         <div class="grid grid-cards" style="margin-bottom:16px;">${goal.elements.map(elm => `
           <div class="card" data-el-edit="${elm.id}" data-goal="${goal.id}" data-cat="${cat.id}">
-            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><input class="el-name-input" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"></div>
+            <div class="field"><label>${escapeHtml(t("structure.elementName"))}</label><div style="display:flex;gap:6px;"><input class="el-name-input" style="flex:1;min-width:0;" value="${escapeHtml(elm.name||"")}" placeholder="${escapeHtml(t("structure.elementNamePh"))}"><button type="button" class="btn btn-sm" data-paste-btn title="${escapeHtml(t("structure.pasteBtn"))}">${iconSvg("paste",14)}</button></div></div>
             <div class="field"><label>${escapeHtml(t("structure.unit"))}</label><input class="el-unit-input" value="${escapeHtml(elm.unit||"")}" placeholder="${escapeHtml(t("structure.unitPh"))}"></div>
             <div class="field"><label>${escapeHtml(t("structure.direction"))}</label>
               <select class="el-direction-input">
@@ -937,6 +938,7 @@ async function renderStructureView(el){
       } catch (err) { toast(t("common.error")+err.message, true); }
     });
   });
+  bindPasteButtons(el);
 }
 
 /* ============================================================
