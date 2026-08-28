@@ -165,11 +165,66 @@ export const ICONS = {
   archive: '<rect x="3.5" y="4.5" width="17" height="4.2" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 8.7v9a1.6 1.6 0 001.6 1.6h11.8a1.6 1.6 0 001.6-1.6v-9" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="12.2" x2="14" y2="12.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   download: '<path d="M12 3.5v11.5M7.5 11l4.5 4.5L16.5 11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.5" y1="19.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   print: '<rect x="5" y="8.5" width="14" height="7.5" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 8.5V4.5h10v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="7.5" y="13" width="9" height="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
-  upload: '<path d="M12 16.5V5M7.5 9l4.5-4.5L16.5 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.5" y1="19.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+  upload: '<path d="M12 16.5V5M7.5 9l4.5-4.5L16.5 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.5" y1="19.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  paste: '<rect x="6" y="4.5" width="12" height="16" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="6" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="8.7" y1="11" x2="15.3" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="8.7" y1="14.3" x2="15.3" y2="14.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="8.7" y1="17.6" x2="12.5" y2="17.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>'
 };
 export function iconSvg(name, size){
   size = size || 16;
   return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" aria-hidden="true">' + (ICONS[name] || ICONS.target) + '</svg>';
+}
+
+// Bufer (clipboard)dan matnni maydonga joylashtirish tugmasi — ba'zi
+// muhitlarda (korporativ siyosat, kengaytmalar) Ctrl+V va o'ng tugma
+// "Paste" ishlamay qolishi mumkin; bu tugma Clipboard API orqali muqobil
+// yo'l taqdim etadi. `scopeEl` ichidagi barcha [data-paste-btn] tugmalarini
+// ularning ".field" ota-blokidagi birinchi input/textarea'ga bog'laydi.
+export function bindPasteButtons(scopeEl){
+  const root = scopeEl || document;
+  root.querySelectorAll("[data-paste-btn]").forEach(btn => {
+    if (btn.__pasteBound) return;
+    btn.__pasteBound = true;
+    btn.addEventListener("click", async () => {
+      const wrap = btn.closest(".field") || btn.parentElement;
+      const input = wrap ? wrap.querySelector("input, textarea") : null;
+      if (!input) return;
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        input.focus();
+        toast(t("structure.pasteFailed"), true);
+        return;
+      }
+      // Ba'zi muhitlarda (korporativ siyosat) ruxsat so'rovi hech qachon
+      // javob olmay "osilib" qolishi mumkin — shu sabab vaqt chegarasi
+      // qo'yilgan, aks holda tugma foydalanuvchiga hech narsa demay
+      // abadiy kutib qoladi.
+      if (btn.__pasteBusy) return;
+      btn.__pasteBusy = true;
+      const prevOpacity = btn.style.opacity;
+      btn.style.opacity = "0.5";
+      try {
+        const text = await Promise.race([
+          navigator.clipboard.readText(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("clipboard-timeout")), 3500))
+        ]);
+        if (!text || !text.trim()) {
+          toast(t("structure.pasteEmpty"), true);
+          input.focus();
+          return;
+        }
+        const single = text.replace(/\s*[\r\n]+\s*/g, " ").trim();
+        const start = input.selectionStart != null ? input.selectionStart : input.value.length;
+        const end = input.selectionEnd != null ? input.selectionEnd : input.value.length;
+        input.value = input.value.slice(0, start) + single + input.value.slice(end);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+      } catch (e) {
+        input.focus();
+        toast(t("structure.pasteFailed"), true);
+      } finally {
+        btn.__pasteBusy = false;
+        btn.style.opacity = prevOpacity;
+      }
+    });
+  });
 }
 
 /* ============================================================
