@@ -50,6 +50,9 @@ const MONTHS = {
 export function monthName(idx){
   return (MONTHS[currentLang] && MONTHS[currentLang][idx]) || MONTHS.uz[idx] || "";
 }
+export function monthShort(idx){
+  return monthName(idx).slice(0,3);
+}
 
 /* ---------------- fixed category names (board structure is seeded once
    with uz/en names; ids are fixed, so we translate by id regardless of
@@ -93,8 +96,37 @@ const S = {
     "nav.assignments": "Tayinlashlar",
     "nav.users": "Foydalanuvchilar",
     "nav.structure": "Tuzilma",
+    "nav.warnings": "Ogohlantirishlar",
+    "nav.results": "Natijalar",
     "nav.profile": "Mening profilim",
     "nav.logout": "Chiqish",
+
+    "warnings.title": "Ogohlantirishlar",
+    "warnings.sub": "Bir pog'ona quyi darajadagi xodimga ogohlantirish (sariq kartochka) berish",
+    "warnings.giveTitle": "Sariq kartochka berish",
+    "warnings.target": "Kimga",
+    "warnings.reason": "Sababi",
+    "warnings.reasonPh": "Ogohlantirish sababini yozing...",
+    "warnings.give": "Berish",
+    "warnings.noTargets": "Sizga bo'ysunuvchi foydalanuvchilar hali tayinlanmagan.",
+    "warnings.reasonRequired": "Sababni yozing",
+    "warnings.selectTarget": "Foydalanuvchi tanlang",
+    "warnings.issued": "Sariq kartochka berildi",
+    "warnings.receivedTitle": "Menga berilgan ogohlantirishlar ({n})",
+    "warnings.receivedEmpty": "Sizga hozircha ogohlantirish berilmagan.",
+    "warnings.sentTitle": "Men bergan ogohlantirishlar ({n})",
+    "warnings.from": "Kimdan: ",
+    "warnings.ack": "Ko'rdim",
+    "warnings.acked": "Ko'rildi",
+
+    "results.title": "Natijalar",
+    "results.sub": "Doskaning umumiy ko'rsatkichlari",
+    "results.goalsMet": "Bajarilgan maqsadlar",
+    "results.byCategory": "Bo'limlar bo'yicha",
+    "results.trend": "So'nggi 6 oy dinamikasi",
+    "results.pendingApprovals": "Kutilayotgan tasdiqlar",
+    "results.overdueActions": "Muddati o'tgan chora-tadbirlar",
+    "results.noHistory": "Hali yetarli tarixiy ma'lumot yo'q",
 
     "structure.title": "Tuzilma",
     "structure.sub": "Barcha bo'lim, maqsad va elementlarning nomlarini kiriting yoki tahrirlang",
@@ -271,7 +303,8 @@ const S = {
     "board.goalNotEntered": "Maqsad kiritilmagan",
     "board.elementNotEntered": "Element kiritilmagan",
     "board.noData": "Ma'lumot yo'q",
-    "board.plan": "reja: "
+    "board.plan": "reja: ",
+    "board.trend": "So'nggi 6 oy"
   },
 
   en: {
@@ -296,8 +329,37 @@ const S = {
     "nav.assignments": "Assignments",
     "nav.users": "Users",
     "nav.structure": "Structure",
+    "nav.warnings": "Warnings",
+    "nav.results": "Results",
     "nav.profile": "My profile",
     "nav.logout": "Log out",
+
+    "warnings.title": "Warnings",
+    "warnings.sub": "Issue a warning (yellow card) to staff one level below you",
+    "warnings.giveTitle": "Issue a yellow card",
+    "warnings.target": "To whom",
+    "warnings.reason": "Reason",
+    "warnings.reasonPh": "Describe the reason...",
+    "warnings.give": "Issue",
+    "warnings.noTargets": "No subordinate users are assigned to you yet.",
+    "warnings.reasonRequired": "Write a reason",
+    "warnings.selectTarget": "Select a user",
+    "warnings.issued": "Yellow card issued",
+    "warnings.receivedTitle": "Warnings I've received ({n})",
+    "warnings.receivedEmpty": "You haven't received any warnings.",
+    "warnings.sentTitle": "Warnings I've issued ({n})",
+    "warnings.from": "From: ",
+    "warnings.ack": "Acknowledge",
+    "warnings.acked": "Acknowledged",
+
+    "results.title": "Results",
+    "results.sub": "Overall board performance",
+    "results.goalsMet": "Goals met",
+    "results.byCategory": "By department",
+    "results.trend": "Trend — last 6 months",
+    "results.pendingApprovals": "Pending approvals",
+    "results.overdueActions": "Overdue corrective actions",
+    "results.noHistory": "Not enough historical data yet",
 
     "structure.title": "Structure",
     "structure.sub": "Enter or edit the names of all departments, goals, and elements",
@@ -474,7 +536,8 @@ const S = {
     "board.goalNotEntered": "Goal not entered",
     "board.elementNotEntered": "Element not entered",
     "board.noData": "No data",
-    "board.plan": "plan: "
+    "board.plan": "plan: ",
+    "board.trend": "Last 6 months"
   },
 
   ru: {
@@ -499,8 +562,37 @@ const S = {
     "nav.assignments": "Назначения",
     "nav.users": "Пользователи",
     "nav.structure": "Структура",
+    "nav.warnings": "Предупреждения",
+    "nav.results": "Результаты",
     "nav.profile": "Мой профиль",
     "nav.logout": "Выход",
+
+    "warnings.title": "Предупреждения",
+    "warnings.sub": "Выдайте предупреждение (жёлтую карточку) сотруднику на уровень ниже вас",
+    "warnings.giveTitle": "Выдать жёлтую карточку",
+    "warnings.target": "Кому",
+    "warnings.reason": "Причина",
+    "warnings.reasonPh": "Опишите причину...",
+    "warnings.give": "Выдать",
+    "warnings.noTargets": "Вам ещё не назначены подчинённые пользователи.",
+    "warnings.reasonRequired": "Укажите причину",
+    "warnings.selectTarget": "Выберите пользователя",
+    "warnings.issued": "Жёлтая карточка выдана",
+    "warnings.receivedTitle": "Полученные мной предупреждения ({n})",
+    "warnings.receivedEmpty": "Вам пока не выдано ни одного предупреждения.",
+    "warnings.sentTitle": "Выданные мной предупреждения ({n})",
+    "warnings.from": "От: ",
+    "warnings.ack": "Ознакомлен(а)",
+    "warnings.acked": "Ознакомлено",
+
+    "results.title": "Результаты",
+    "results.sub": "Общие показатели доски",
+    "results.goalsMet": "Достигнутые цели",
+    "results.byCategory": "По отделам",
+    "results.trend": "Динамика за последние 6 месяцев",
+    "results.pendingApprovals": "Ожидающие утверждения",
+    "results.overdueActions": "Просроченные меры",
+    "results.noHistory": "Пока недостаточно исторических данных",
 
     "structure.title": "Структура",
     "structure.sub": "Введите или отредактируйте названия всех отделов, целей и элементов",
@@ -677,7 +769,8 @@ const S = {
     "board.goalNotEntered": "Цель не введена",
     "board.elementNotEntered": "Элемент не введён",
     "board.noData": "Нет данных",
-    "board.plan": "план: "
+    "board.plan": "план: ",
+    "board.trend": "Последние 6 месяцев"
   }
 };
 
