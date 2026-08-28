@@ -306,6 +306,7 @@ table.data-table tr:hover td{ background:var(--surface-2); }
 .el-row{ display:grid; grid-template-columns:1fr 108px 92px; gap:10px; align-items:center; padding:8px; border-radius:8px; background:var(--surface-2); }
 .el-name{ font-size:12.5px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:5px; }
 .dir-arrow{ font-size:11px; color:var(--faint); }
+.name-en{ font-style:italic; color:var(--muted); font-weight:500; }
 .el-unit{ font-size:11px; color:var(--muted); font-weight:500; }
 .el-values{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
 .el-values .fact{ font-family:"IBM Plex Mono",monospace; font-weight:700; font-size:13.5px; }
