@@ -8,7 +8,7 @@ import {
   lastNMonths, statusStripSvg, donutSvg, hBarChartSvg, lineChartSvg,
   effectiveTheme, setTheme, downloadCsv, parseCsv, bindPasteButtons
 } from "./utils.js";
-import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName, monthShort } from "./i18n.js";
+import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName, monthShort, monthName } from "./i18n.js";
 
 /* ============================================================
    SESSION / GLOBAL STATE
@@ -75,20 +75,63 @@ function bindThemeToggle(scopeEl, onChange){
 /* ============================================================
    LOGIN
    ============================================================ */
+function loginHeroIllustrationSvg(){
+  return `<svg class="login-hero-illustration" viewBox="0 0 300 148" aria-hidden="true">
+    <line x1="8" y1="128" x2="292" y2="128" stroke="rgba(255,255,255,.22)" stroke-width="1.4"/>
+    <line x1="20" y1="118" x2="20" y2="128" stroke="rgba(255,255,255,.14)" stroke-width="10" stroke-dasharray="1.4 8" stroke-linecap="round"/>
+    <!-- stacked crates -->
+    <g>
+      <rect x="22" y="86" width="34" height="42" rx="2.5" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.4)" stroke-width="1.4"/>
+      <line x1="22" y1="104" x2="56" y2="104" stroke="rgba(255,255,255,.3)" stroke-width="1.2"/>
+      <rect x="60" y="66" width="30" height="62" rx="2.5" fill="rgba(90,143,214,.16)" stroke="rgba(255,255,255,.42)" stroke-width="1.4"/>
+      <line x1="60" y1="94" x2="90" y2="94" stroke="rgba(255,255,255,.3)" stroke-width="1.2"/>
+      <line x1="75" y1="66" x2="75" y2="128" stroke="rgba(255,255,255,.22)" stroke-width="1.1"/>
+    </g>
+    <!-- forklift -->
+    <g>
+      <line x1="128" y1="46" x2="128" y2="118" stroke="rgba(255,255,255,.5)" stroke-width="2.6" stroke-linecap="round"/>
+      <line x1="140" y1="46" x2="140" y2="118" stroke="rgba(255,255,255,.5)" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="112" y="52" width="26" height="20" rx="2" fill="#e0973f" opacity=".9"/>
+      <rect x="150" y="80" width="66" height="30" rx="5" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.55)" stroke-width="1.6"/>
+      <rect x="205" y="60" width="24" height="26" rx="4" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.55)" stroke-width="1.6"/>
+      <line x1="128" y1="112" x2="150" y2="112" stroke="rgba(255,255,255,.55)" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="128" y1="119" x2="150" y2="119" stroke="rgba(255,255,255,.55)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="166" cy="122" r="9.5" fill="rgba(11,26,48,1)" stroke="rgba(255,255,255,.6)" stroke-width="2"/>
+      <circle cx="166" cy="122" r="3" fill="rgba(255,255,255,.6)"/>
+      <circle cx="200" cy="122" r="9.5" fill="rgba(11,26,48,1)" stroke="rgba(255,255,255,.6)" stroke-width="2"/>
+      <circle cx="200" cy="122" r="3" fill="rgba(255,255,255,.6)"/>
+    </g>
+    <!-- safety badge -->
+    <g transform="translate(246,20)">
+      <polygon points="14,0 26,5.6 26,14 14,26 2,14 2,5.6" fill="rgba(76,175,125,.18)" stroke="#4caf7d" stroke-width="1.6" stroke-linejoin="round"/>
+      <polyline points="8.4,13.6 12.2,17.4 19,10.2" fill="none" stroke="#4caf7d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <line x1="94" y1="30" x2="150" y2="18" stroke="rgba(255,255,255,.16)" stroke-width="1.2" stroke-dasharray="3 5"/>
+  </svg>`;
+}
 export function renderLogin(errMsg){
   root().innerHTML = `
     <div class="login-wrap">
-      <div class="login-card">
-        <div class="topbar-row">${langSwitchHtml("lang-switch-light")}${themeToggleHtml("theme-toggle-btn-light")}</div>
-        <div class="login-eyebrow">${escapeHtml(t("login.eyebrow"))}</div>
-        <div class="login-title">${escapeHtml(t("login.title"))}</div>
-        <div class="login-sub">${escapeHtml(t("login.sub"))}</div>
-        <form id="login-form" style="display:flex;flex-direction:column;gap:12px;">
-          <div class="field"><label>${escapeHtml(t("login.username"))}</label><input id="login-username" autocomplete="username" required></div>
-          <div class="field"><label>${escapeHtml(t("login.password"))}</label><input id="login-password" type="password" autocomplete="current-password" required></div>
-          <div class="error-text" id="login-err">${escapeHtml(errMsg || "")}</div>
-          <button class="btn btn-primary btn-block" type="submit" id="login-btn">${escapeHtml(t("login.submit"))}</button>
-        </form>
+      <div class="login-shell">
+        <div class="login-hero">
+          <div class="topbar-row" style="justify-content:flex-end;">${langSwitchHtml("lang-switch")}${themeToggleHtml("theme-toggle-btn")}</div>
+          <div class="login-hero-content">
+            <div class="login-eyebrow">${escapeHtml(t("login.eyebrow"))}</div>
+            <div class="login-hero-title">${escapeHtml(t("login.title"))}</div>
+            <div class="login-hero-tag">${escapeHtml(t("login.heroTag"))}</div>
+          </div>
+          ${loginHeroIllustrationSvg()}
+        </div>
+        <div class="login-card">
+          <div class="login-title">${escapeHtml(t("login.formTitle"))}</div>
+          <div class="login-sub">${escapeHtml(t("login.sub"))}</div>
+          <form id="login-form" style="display:flex;flex-direction:column;gap:12px;">
+            <div class="field"><label>${escapeHtml(t("login.username"))}</label><input id="login-username" autocomplete="username" required></div>
+            <div class="field"><label>${escapeHtml(t("login.password"))}</label><input id="login-password" type="password" autocomplete="current-password" required></div>
+            <div class="error-text" id="login-err">${escapeHtml(errMsg || "")}</div>
+            <button class="btn btn-primary btn-block" type="submit" id="login-btn">${escapeHtml(t("login.submit"))}</button>
+          </form>
+        </div>
       </div>
     </div>`;
   bindLangSwitch(root(), () => renderLogin(errMsg));
@@ -124,6 +167,7 @@ function NAV(){
     { id: "results", label: t("nav.results"), icon: "chart", roles: null },
     { id: "archive", label: t("nav.archive"), icon: "archive", roles: null },
     { id: "entry", label: t("nav.entry"), icon: "check", roles: ["elementOwner"] },
+    { id: "annualPlan", label: t("nav.annualPlan"), icon: "calendar", roles: ["goalOwner"] },
     { id: "approvals", label: t("nav.approvals"), icon: "bell", roles: ["goalOwner","responsible","boardOwner"] },
     { id: "actions", label: t("nav.actions"), icon: "link", roles: null },
     { id: "warnings", label: t("nav.warnings"), icon: "warn", roles: ["boardOwner","responsible","goalOwner","elementOwner"] },
@@ -241,6 +285,7 @@ async function renderMain(){
     if (activeView === "results") return renderResultsView(el);
     if (activeView === "archive") return renderArchiveView(el);
     if (activeView === "entry") return renderEntryView(el);
+    if (activeView === "annualPlan") return renderAnnualPlanView(el);
     if (activeView === "approvals") return renderApprovalsView(el);
     if (activeView === "actions") return renderActionsView(el);
     if (activeView === "warnings") return renderWarningsView(el);
@@ -284,9 +329,12 @@ function findEntry(list, elementId, month){
 function elDisplay(el, month){
   const list = entriesCache[month] || [];
   const entry = findEntry(list, el.id);
-  if (!entry) return { entry:null, plan:null, fact:null, status:"none", confirmed:false, pillState:"none", pillText:t("entry.dataNone") };
+  if (!entry) return { entry:null, plan:null, fact:null, status:"none", perfStatus:"none", confirmed:false, pillState:"none", pillText:t("entry.dataNone") };
   const confirmed = entry.status === "locked";
-  const status = confirmed ? computeStatus(entry.plan, entry.fact, el.direction) : "none";
+  // "perfStatus" — reja/fakt taqqoslash natijasi (OK/NOK), tasdiq bosqichidan
+  // qat'i nazar har doim hisoblanadi (elementOwner darhol ko'rishi uchun).
+  const perfStatus = computeStatus(entry.plan, entry.fact, el.direction);
+  const status = confirmed ? perfStatus : "none"; // doska/arxiv umumiy hisobotlari faqat yakuniy tasdiqlangan natijaga tayanadi
   let pillState = "none", pillText = t("entry.pending");
   if (entry.status === "submitted") { pillState="none"; pillText=t("entry.pill.stage1"); }
   else if (entry.status === "goal_approved") { pillState="warn"; pillText=t("entry.pill.stage2"); }
@@ -295,7 +343,14 @@ function elDisplay(el, month){
   else if (entry.status === "goal_rejected") { pillState="bad"; pillText=t("entry.pill.rejectedGoal"); }
   else if (entry.status === "responsible_rejected") { pillState="bad"; pillText=t("entry.pill.rejectedResp"); }
   else if (entry.status === "owner_rejected") { pillState="bad"; pillText=t("entry.pill.rejectedOwner"); }
-  return { entry, plan: entry.plan, fact: entry.fact, status, confirmed, pillState, pillText };
+  return { entry, plan: entry.plan, fact: entry.fact, status, perfStatus, confirmed, pillState, pillText };
+}
+// Reja/fakt taqqoslash natijasini kichik belgi (OK/NOK) sifatida chizadi.
+function perfBadgeHtml(perfStatus){
+  if (!perfStatus || perfStatus === "none") return "";
+  const cls = perfStatus === "good" ? "good" : perfStatus === "warn" ? "warn" : "bad";
+  const label = perfStatus === "good" ? t("entry.perfOk") : perfStatus === "warn" ? t("entry.perfWarn") : t("entry.perfNok");
+  return `<span class="pill pill-${cls}" title="${escapeHtml(t("entry.perfLabel"))}">${escapeHtml(label)}</span>`;
 }
 function goalCheck(goal, month){
   const sts = goal.elements.map(el => elDisplay(el, month).status);
@@ -378,37 +433,47 @@ function closeModal(){
 /* ============================================================
    ENTRY VIEW (element owner: monthly plan/fact + photo)
    ============================================================ */
+function entryMonthOptionsHtml(selected){
+  const y = parseInt(selected.split("-")[0], 10);
+  const years = [y-1, y];
+  return years.map(yr => `<optgroup label="${yr}">${monthsOfYear(yr).map(m => {
+    const mi = parseInt(m.split("-")[1],10)-1;
+    return `<option value="${m}" ${m===selected?"selected":""}>${escapeHtml(monthName(mi))} ${yr}</option>`;
+  }).join("")}</optgroup>`).join("");
+}
 async function renderEntryView(el){
   await ensureMonthLoaded(entriesMonth);
   const items = myElements();
   el.innerHTML = `
     <div class="page-header">
       <div><div class="page-title">${escapeHtml(t("entry.title"))}</div><div class="page-sub">${escapeHtml(t("entry.sub"))}</div></div>
-      <div style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px;">
-        <button class="btn btn-sm" id="prev-month" style="border:0;background:transparent;">&#8249;</button>
-        <span class="mono" style="min-width:110px;text-align:center;font-weight:600;">${monthYear(entriesMonth)}</span>
-        <button class="btn btn-sm" id="next-month" style="border:0;background:transparent;">&#8250;</button>
+      <div class="field" style="min-width:190px;">
+        <label>${escapeHtml(t("entry.selectMonth"))}</label>
+        <select id="entry-month-select">${entryMonthOptionsHtml(entriesMonth)}</select>
       </div>
     </div>
     ${items.length===0 ? `<div class="empty-state">${escapeHtml(t("entry.empty"))}</div>` :
       `<div class="grid grid-cards">${items.map(it => entryCardHtml(it)).join("")}</div>`}
   `;
-  document.getElementById("prev-month").addEventListener("click", async ()=>{ entriesMonth = shiftMonth(entriesMonth,-1); await renderMain(); });
-  document.getElementById("next-month").addEventListener("click", async ()=>{ entriesMonth = shiftMonth(entriesMonth,1); await renderMain(); });
+  document.getElementById("entry-month-select").addEventListener("change", async (e) => { entriesMonth = e.target.value; await renderMain(); });
   items.forEach(it => bindEntryCard(it));
 }
 function entryCardHtml(it){
   const d = elDisplay(it.el, entriesMonth);
   const locked = d.entry && d.entry.status === "locked";
+  const planVal = (it.el.plan && it.el.plan[entriesMonth] !== undefined && it.el.plan[entriesMonth] !== null) ? it.el.plan[entriesMonth] : null;
   return `<div class="card" data-entry-card="${it.el.id}">
     <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">${escapeHtml(catName(it.cat))} &rsaquo; ${escapeHtml(it.goal.title||t("entry.unnamedGoal"))}</div>
     <div style="font-weight:700;margin-bottom:8px;">${escapeHtml(it.el.name || t("entry.unnamedElement"))} ${it.el.unit?`<span style="color:var(--muted);font-weight:500;">(${escapeHtml(it.el.unit)})</span>`:""}</div>
-    ${d.entry ? `<div style="margin-bottom:8px;"><span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span></div>` : ""}
+    ${d.entry ? `<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;"><span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>${perfBadgeHtml(d.perfStatus)}</div>` : ""}
     ${d.entry && (d.entry.status==='goal_rejected'||d.entry.status==='responsible_rejected'||d.entry.status==='owner_rejected') && d.entry[d.entry.status.replace('_rejected','Review')]?.comment ?
       `<div class="reject-reason">${escapeHtml(t("entry.reason"))}${escapeHtml(d.entry[d.entry.status.replace('_rejected','Review')].comment)}</div>` : ""}
     ${locked ? `<div class="empty-state" style="padding:10px 0;">${escapeHtml(t("entry.locked"))}</div>` : `
-      <div class="field"><label>${escapeHtml(t("entry.plan"))}</label><input type="number" step="any" class="entry-plan" value="${d.plan!==null&&d.plan!==undefined?d.plan:''}"></div>
-      <div class="field"><label>${escapeHtml(t("entry.fact"))}</label><input type="number" step="any" class="entry-fact" value="${d.fact!==null&&d.fact!==undefined?d.fact:''}"></div>
+      <div class="field"><label>${escapeHtml(t("entry.planReadonly"))}</label>
+        <div class="mono" data-plan-display style="padding:9px 11px;border:1px solid var(--border-soft);border-radius:8px;background:var(--surface-2);color:${planVal===null?"var(--faint)":"var(--ink)"};">${planVal===null?escapeHtml(t("entry.planNotSet")):escapeHtml(String(planVal))}</div>
+      </div>
+      <div class="field"><label>${escapeHtml(t("entry.fact"))}</label><input type="number" step="any" class="entry-fact" data-plan-val="${planVal===null?"":planVal}" data-direction="${escapeHtml(it.el.direction||"down")}" value="${d.fact!==null&&d.fact!==undefined?d.fact:''}"></div>
+      <div style="margin:2px 0 4px;" data-live-perf>${planVal!==null && d.fact!==null&&d.fact!==undefined ? perfBadgeHtml(computeStatus(planVal, d.fact, it.el.direction)) : ""}</div>
       <div class="field"><label>${escapeHtml(t("entry.document"))}</label>
         <div class="photo-drop" data-photo-drop>
           ${d.entry&&d.entry.photo?`<img class="photo-preview" src="${d.entry.photo}">`:`<div class="photo-preview" style="display:flex;align-items:center;justify-content:center;color:var(--faint);">+</div>`}
@@ -437,20 +502,31 @@ function bindEntryCard(it){
       } catch (err) { toast(err.message, true); }
     });
   }
+  const factInput = card.querySelector(".entry-fact");
+  const livePerf = card.querySelector("[data-live-perf]");
+  if (factInput && livePerf) {
+    factInput.addEventListener("input", () => {
+      const planStr = factInput.getAttribute("data-plan-val");
+      const planNum = planStr === "" ? null : Number(planStr);
+      const factNum = factInput.value === "" ? null : Number(factInput.value);
+      livePerf.innerHTML = (planNum !== null && factNum !== null && !isNaN(factNum)) ?
+        perfBadgeHtml(computeStatus(planNum, factNum, factInput.getAttribute("data-direction"))) : "";
+    });
+  }
   const btn = card.querySelector(".entry-submit-btn");
   if (!btn) return;
   btn.addEventListener("click", async () => {
     if (busy) return;
-    const plan = card.querySelector(".entry-plan").value;
+    const planVal = (it.el.plan && it.el.plan[entriesMonth] !== undefined && it.el.plan[entriesMonth] !== null) ? it.el.plan[entriesMonth] : null;
     const fact = card.querySelector(".entry-fact").value;
-    if (plan === "" || fact === "") { toast(t("entry.validation"), true); return; }
+    if (fact === "") { toast(t("entry.validation"), true); return; }
     busy = true; btn.disabled = true; btn.textContent = t("entry.submitting");
     try {
       const existing = findEntry(entriesCache[entriesMonth], it.el.id);
       if (existing) {
-        await fb.resubmitEntry(existing.id, { plan: Number(plan), fact: Number(fact), photo: pendingPhoto });
+        await fb.resubmitEntry(existing.id, { plan: planVal, fact: Number(fact), photo: pendingPhoto });
       } else {
-        await fb.submitEntry({ categoryId: it.cat.id, goalId: it.goal.id, elementId: it.el.id, month: entriesMonth, plan: Number(plan), fact: Number(fact), photo: pendingPhoto, direction: it.el.direction, unit: it.el.unit });
+        await fb.submitEntry({ categoryId: it.cat.id, goalId: it.goal.id, elementId: it.el.id, month: entriesMonth, plan: planVal, fact: Number(fact), photo: pendingPhoto, direction: it.el.direction, unit: it.el.unit });
       }
       entriesCache[entriesMonth] = await fb.listEntriesByMonth(entriesMonth);
       historyCache = null;
@@ -460,6 +536,65 @@ function bindEntryCard(it){
       toast(t("common.error") + err.message, true);
       btn.disabled = false; btn.textContent = t("entry.submit");
     } finally { busy = false; }
+  });
+}
+
+/* ============================================================
+   ANNUAL PLAN VIEW (goal owner: 12-month plan per element)
+   ============================================================ */
+let annualPlanYear = new Date().getFullYear();
+async function renderAnnualPlanView(el){
+  const cat = myCategory();
+  if (!cat) { el.innerHTML = `<div class="empty-state">${escapeHtml(t("annualPlan.noCategoryYet"))}</div>`; return; }
+  const nowYear = new Date().getFullYear();
+  const years = [nowYear-1, nowYear, nowYear+1];
+  const months = monthsOfYear(annualPlanYear);
+  const monthLabels = months.map(m => monthShort(parseInt(m.split("-")[1],10)-1));
+  el.innerHTML = `
+    <div class="page-header">
+      <div><div class="page-title">${escapeHtml(t("annualPlan.title"))}</div><div class="page-sub">${escapeHtml(t("annualPlan.sub"))}</div></div>
+      <div class="field" style="min-width:120px;">
+        <label>${escapeHtml(t("annualPlan.year"))}</label>
+        <select id="plan-year-select">${years.map(y=>`<option value="${y}" ${y===annualPlanYear?"selected":""}>${y}</option>`).join("")}</select>
+      </div>
+    </div>
+    ${cat.goals.map(goal => `
+      <h3 style="font-size:14.5px;font-weight:800;margin:18px 0 8px;">${escapeHtml(goal.title||t("entry.unnamedGoal"))}</h3>
+      <div class="table-wrap" style="margin-bottom:14px;"><table class="data-table plan-table">
+        <thead><tr>
+          <th style="text-align:left;">${escapeHtml(t("annualPlan.thElement"))}</th>
+          ${monthLabels.map(ml=>`<th>${escapeHtml(ml)}</th>`).join("")}
+          <th></th>
+        </tr></thead>
+        <tbody>${goal.elements.map(elm => `
+          <tr data-plan-row="${elm.id}" data-goal="${goal.id}">
+            <td style="text-align:left;min-width:150px;">${escapeHtml(elm.name||t("entry.unnamedElement"))}${elm.unit?` <span class="entry-meta">(${escapeHtml(elm.unit)})</span>`:""}</td>
+            ${months.map(m => `<td><input type="number" step="any" class="plan-month-input mono" data-month="${m}" style="width:64px;text-align:center;padding:6px 4px;" value="${elm.plan&&elm.plan[m]!==undefined&&elm.plan[m]!==null?elm.plan[m]:''}"></td>`).join("")}
+            <td><button class="btn btn-sm btn-primary plan-save-btn">${escapeHtml(t("annualPlan.save"))}</button></td>
+          </tr>`).join("")}</tbody>
+      </table></div>
+    `).join("")}
+  `;
+  document.getElementById("plan-year-select").addEventListener("change", async (e) => { annualPlanYear = parseInt(e.target.value,10); await renderMain(); });
+  el.querySelectorAll("[data-plan-row]").forEach(row => {
+    const elId = row.getAttribute("data-plan-row");
+    const goalId = row.getAttribute("data-goal");
+    const goal = cat.goals.find(g => g.id === goalId);
+    const elm = goal ? goal.elements.find(e => e.id === elId) : null;
+    row.querySelector(".plan-save-btn").addEventListener("click", async () => {
+      if (!elm) return;
+      const merged = Object.assign({}, elm.plan || {});
+      row.querySelectorAll(".plan-month-input").forEach(inp => {
+        const m = inp.getAttribute("data-month");
+        merged[m] = inp.value === "" ? null : Number(inp.value);
+      });
+      try {
+        await fb.updateElementMeta(cat.id, goalId, elId, { plan: merged });
+        toast(t("annualPlan.saved"));
+        structure = await fb.getFullStructure();
+        await renderMain();
+      } catch (err) { toast(t("common.error")+err.message, true); }
+    });
   });
 }
 
@@ -486,13 +621,15 @@ async function renderApprovalsView(el){
 function approvalCardHtml(entry){
   const path = findElementPath(entry.elementId);
   const title = path ? `${escapeHtml(catName(path.cat))} &rsaquo; ${escapeHtml(path.el.name||t("approvals.element"))}` : escapeHtml(t("approvals.element"));
+  const perfStatus = path ? computeStatus(entry.plan, entry.fact, path.el.direction) : "none";
   return `<div class="entry-card" data-approval="${entry.id}">
     <div class="entry-head">
       <div><div style="font-weight:700;">${title}</div>
         <div class="entry-meta">${escapeHtml(t("approvals.enteredBy"))}${escapeHtml(userLabel(entry.enteredBy))} &middot; ${fmtDateTime(entry.enteredAt)}</div></div>
+      ${perfBadgeHtml(perfStatus)}
     </div>
     <div class="entry-values">
-      <div class="entry-value"><span class="lab">${escapeHtml(t("entry.plan"))}</span><span class="val mono">${entry.plan}</span></div>
+      <div class="entry-value"><span class="lab">${escapeHtml(t("entry.plan"))}</span><span class="val mono">${entry.plan!==null&&entry.plan!==undefined?entry.plan:'—'}</span></div>
       <div class="entry-value"><span class="lab">${escapeHtml(t("entry.fact"))}</span><span class="val mono">${entry.fact}</span></div>
     </div>
     ${entry.photo ? `<a class="entry-photo-link" href="${entry.photo}" target="_blank" rel="noopener">${escapeHtml(t("approvals.viewDoc"))}</a>` : `<div class="entry-meta">${escapeHtml(t("approvals.noDoc"))}</div>`}
@@ -1437,7 +1574,7 @@ function catDetailHtml(cat){
       html += `<div class="el-row" style="grid-template-columns:1fr auto;">
         <div><div class="el-name">${elm.direction==='up'?'&#8593;':'&#8595;'} ${elm.name?escapeHtml(elm.name):`<span style="color:var(--faint);">${escapeHtml(t("board.elementNotEntered"))}</span>`}</div>
           ${elm.unit?`<div class="el-unit">${escapeHtml(elm.unit)}</div>`:""}
-          <div style="margin-top:3px;">${d.entry ? `<span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>` : `<span class="pill pill-none">${escapeHtml(t("board.noData"))}</span>`}</div>
+          <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap;">${d.entry ? `<span class="pill pill-${d.pillState==='good'?'good':d.pillState==='bad'?'bad':d.pillState==='warn'?'warn':'none'}">${escapeHtml(d.pillText)}</span>${perfBadgeHtml(d.perfStatus)}` : `<span class="pill pill-none">${escapeHtml(t("board.noData"))}</span>`}</div>
           <div style="margin-top:6px;">${strip}</div>
         </div>
         <div class="el-values">
