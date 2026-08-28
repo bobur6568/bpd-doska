@@ -5,7 +5,8 @@ import * as fb from "./firebase.js";
 import {
   escapeHtml, currentMonth, monthYear, shiftMonth, fmtDateTime, fmtDate,
   todayStr, daysUntil, compressImageFile, toast, initials, iconSvg,
-  lastNMonths, statusStripSvg, donutSvg, hBarChartSvg, lineChartSvg
+  lastNMonths, statusStripSvg, donutSvg, hBarChartSvg, lineChartSvg,
+  effectiveTheme, setTheme, downloadCsv, parseCsv
 } from "./utils.js";
 import { t, getLang, setLang, LANGS, LANG_NAMES, roleLabel, catName, monthShort } from "./i18n.js";
 
@@ -21,6 +22,9 @@ let entriesCache = {};       // month -> [entries]
 let actionsCache = null;
 let historyCache = null;     // flat list of entries across the last 6 months (for charts)
 let warningsCache = null;
+let archiveCache = {};       // year -> flat list of entries for that year (Archive view)
+let archiveYear = new Date().getFullYear();
+let archiveCategoryId = null;
 let activeView = "board";
 let activeCategoryId = null;
 let busy = false;
@@ -52,13 +56,30 @@ function bindLangSwitch(scopeEl, onChange){
 }
 
 /* ============================================================
+   THEME TOGGLE (light/dark)
+   ============================================================ */
+function themeToggleHtml(cls){
+  const eff = effectiveTheme();
+  const icon = eff === "dark" ? "sun" : "moon";
+  return `<button type="button" class="${cls}" data-theme-toggle title="${escapeHtml(t("theme.toggle"))}">${iconSvg(icon,15)}</button>`;
+}
+function bindThemeToggle(scopeEl, onChange){
+  const btn = scopeEl.querySelector("[data-theme-toggle]");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    setTheme(effectiveTheme() === "dark" ? "light" : "dark");
+    onChange();
+  });
+}
+
+/* ============================================================
    LOGIN
    ============================================================ */
 export function renderLogin(errMsg){
   root().innerHTML = `
     <div class="login-wrap">
       <div class="login-card">
-        ${langSwitchHtml("lang-switch-light")}
+        <div class="topbar-row">${langSwitchHtml("lang-switch-light")}${themeToggleHtml("theme-toggle-btn-light")}</div>
         <div class="login-eyebrow">${escapeHtml(t("login.eyebrow"))}</div>
         <div class="login-title">${escapeHtml(t("login.title"))}</div>
         <div class="login-sub">${escapeHtml(t("login.sub"))}</div>
@@ -71,6 +92,7 @@ export function renderLogin(errMsg){
       </div>
     </div>`;
   bindLangSwitch(root(), () => renderLogin(errMsg));
+  bindThemeToggle(root(), () => renderLogin(errMsg));
   document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const u = document.getElementById("login-username").value.trim();
@@ -100,6 +122,7 @@ function NAV(){
   return [
     { id: "board", label: t("nav.board"), icon: "board", roles: null },
     { id: "results", label: t("nav.results"), icon: "chart", roles: null },
+    { id: "archive", label: t("nav.archive"), icon: "archive", roles: null },
     { id: "entry", label: t("nav.entry"), icon: "check", roles: ["elementOwner"] },
     { id: "approvals", label: t("nav.approvals"), icon: "bell", roles: ["goalOwner","responsible","boardOwner"] },
     { id: "actions", label: t("nav.actions"), icon: "link", roles: null },
@@ -175,7 +198,7 @@ function paintShell(){
           <div class="sidebar-eyebrow">UzAuto Motors</div>
           <div class="sidebar-title">${escapeHtml(t("login.title"))}</div>
         </div>
-        ${langSwitchHtml("lang-switch")}
+        <div class="topbar-row">${langSwitchHtml("lang-switch")}${themeToggleHtml("theme-toggle-btn")}</div>
         ${nav.map(n => {
           let count = 0;
           if (n.id === "approvals") count = pendingApprovalCount();
@@ -199,6 +222,7 @@ function paintShell(){
     </div>`;
   root().querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => { activeView = b.getAttribute("data-nav"); paintShell(); }));
   bindLangSwitch(root(), () => paintShell());
+  bindThemeToggle(root(), () => paintShell());
   document.getElementById("logout-btn").addEventListener("click", () => fb.logout());
   renderMain();
 }
@@ -215,6 +239,7 @@ async function renderMain(){
   try {
     if (activeView === "board") return renderBoardView(el);
     if (activeView === "results") return renderResultsView(el);
+    if (activeView === "archive") return renderArchiveView(el);
     if (activeView === "entry") return renderEntryView(el);
     if (activeView === "approvals") return renderApprovalsView(el);
     if (activeView === "actions") return renderActionsView(el);
@@ -285,22 +310,23 @@ function catCheck(cat, month){
   return "bad";
 }
 function findCat(id){ return structure.find(c => c.id===id) || null; }
-// Tarixiy (ko'p oylik) hisob-kitoblar — diagrammalar uchun, historyCache asosida.
-function entryFromHistory(elementId, month){
-  return (historyCache||[]).find(e => e.elementId===elementId && e.month===month) || null;
+// Tarixiy (ko'p oylik) hisob-kitoblar — diagrammalar uchun. `cache` berilmasa
+// joriy 6 oylik historyCache ishlatiladi; Arxiv ko'rinishi o'z yillik keshini beradi.
+function entryFromHistory(elementId, month, cache){
+  return ((cache||historyCache)||[]).find(e => e.elementId===elementId && e.month===month) || null;
 }
-function elStatusForMonth(el, month){
-  const entry = entryFromHistory(el.id, month);
+function elStatusForMonth(el, month, cache){
+  const entry = entryFromHistory(el.id, month, cache);
   if (!entry || entry.status !== "locked") return null;
   return computeStatus(entry.plan, entry.fact, el.direction);
 }
-function goalOkForMonth(goal, month){
-  const sts = goal.elements.map(el => elStatusForMonth(el, month));
+function goalOkForMonth(goal, month, cache){
+  const sts = goal.elements.map(el => elStatusForMonth(el, month, cache));
   if (sts.some(s => s===null)) return null;
   return sts.every(s => s==="good");
 }
-function goalOkFraction(goal, months){
-  const known = months.map(m => goalOkForMonth(goal, m)).filter(v => v !== null);
+function goalOkFraction(goal, months, cache){
+  const known = months.map(m => goalOkForMonth(goal, m, cache)).filter(v => v !== null);
   if (known.length === 0) return null;
   return known.filter(Boolean).length / known.length;
 }
@@ -932,6 +958,16 @@ async function renderUsersView(el){
       <div><div class="page-title">${escapeHtml(t("users.title"))}</div><div class="page-sub">${escapeHtml(t("users.sub",{n:users.length}))}</div></div>
       <button class="btn btn-primary" id="new-user-btn">${escapeHtml(t("users.new"))}</button>
     </div>
+    <div class="card" style="margin-bottom:16px;max-width:560px;">
+      <h3 style="margin-bottom:6px;">${escapeHtml(t("csvImport.title"))}</h3>
+      <div class="entry-meta" style="margin-bottom:10px;">${escapeHtml(t("csvImport.hint"))}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" id="csv-template-btn">${iconSvg("download",13)} ${escapeHtml(t("csvImport.template"))}</button>
+        <button class="btn btn-sm btn-primary" id="csv-choose-btn">${iconSvg("upload",13)} ${escapeHtml(t("csvImport.choose"))}</button>
+        <input type="file" accept=".csv,text/csv" id="csv-file-input" style="display:none;">
+      </div>
+      <div class="entry-meta" id="csv-import-progress" style="margin-top:8px;"></div>
+    </div>
     <div class="table-wrap"><table class="data-table">
       <thead><tr><th></th><th>${escapeHtml(t("users.th.fullName"))}</th><th>${escapeHtml(t("users.th.login"))}</th><th>${escapeHtml(t("users.th.role"))}</th><th>${escapeHtml(t("users.th.workplace"))}</th><th>${escapeHtml(t("users.th.status"))}</th><th></th></tr></thead>
       <tbody>${users.map(u => `
@@ -947,6 +983,61 @@ async function renderUsersView(el){
     </table></div>`;
   document.getElementById("new-user-btn").addEventListener("click", () => openUserModal(null));
   el.querySelectorAll(".edit-user-btn").forEach(b => b.addEventListener("click", () => openUserModal(usersById[b.getAttribute("data-uid")])));
+  document.getElementById("csv-template-btn").addEventListener("click", downloadCsvUserTemplate);
+  const fileInput = document.getElementById("csv-file-input");
+  document.getElementById("csv-choose-btn").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files[0];
+    if (f) await handleCsvUserImport(f);
+    fileInput.value = "";
+  });
+}
+function downloadCsvUserTemplate(){
+  downloadCsv("bpd-foydalanuvchilar-namuna.csv", [
+    ["username","password","fullName","workplace","position","role"],
+    ["aliyev.b","parol123","Aliyev Bekzod","UzAuto Motors","Bo'linma boshligi","elementOwner"]
+  ]);
+}
+async function handleCsvUserImport(file){
+  const progEl = document.getElementById("csv-import-progress");
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (rows.length < 2) { if (progEl) progEl.textContent = t("csvImport.emptyFile"); return; }
+  const header = rows[0].map(h => (h||"").trim().toLowerCase());
+  const idx = {
+    username: header.indexOf("username"), password: header.indexOf("password"),
+    fullName: header.indexOf("fullname"), workplace: header.indexOf("workplace"),
+    position: header.indexOf("position"), role: header.indexOf("role")
+  };
+  const dataRows = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ""));
+  const validRoles = ["admin","boardOwner","responsible","goalOwner","elementOwner"];
+  let ok = 0; const fails = [];
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    if (progEl) progEl.textContent = t("csvImport.importing", { done: i, total: dataRows.length });
+    const username = (r[idx.username]||"").trim();
+    const password = (r[idx.password]||"").trim();
+    const fullName = (r[idx.fullName]||"").trim();
+    const workplace = (r[idx.workplace]||"").trim();
+    const position = (r[idx.position]||"").trim();
+    const role = (r[idx.role]||"").trim();
+    try {
+      if (!validRoles.includes(role)) throw new Error(t("csvImport.badRole"));
+      if (!username || !fullName) throw new Error(t("userModal.requiredNameLogin"));
+      if (!password || password.length < 6) throw new Error(t("userModal.passwordMin"));
+      await fb.createUserAccount({ username, password, fullName, workplace, position, role });
+      ok++;
+    } catch (err) {
+      fails.push(t("csvImport.rowError", { row: i+2, username: username||"?", err: err.code==="auth/email-already-in-use" ? t("userModal.loginTaken") : err.message }));
+    }
+  }
+  const fresh = await fb.listUsers();
+  usersById = {}; fresh.forEach(u => usersById[u.id] = u);
+  const summary = t("csvImport.done", { ok, fail: fails.length });
+  toast(summary);
+  await renderMain();
+  const progEl2 = document.getElementById("csv-import-progress");
+  if (progEl2) progEl2.innerHTML = escapeHtml(summary) + (fails.length ? "<br>" + fails.map(escapeHtml).join("<br>") : "");
 }
 
 function openUserModal(existing){
@@ -1114,7 +1205,13 @@ async function renderResultsView(el){
   const overdueCount = (actionsCache||[]).filter(a => a.status==="open" && daysUntil(a.deadline) < 0).length;
 
   el.innerHTML = `
-    <div class="page-header"><div><div class="page-title">${escapeHtml(t("results.title"))}</div><div class="page-sub">${escapeHtml(t("results.sub"))}</div></div></div>
+    <div class="page-header">
+      <div><div class="page-title">${escapeHtml(t("results.title"))}</div><div class="page-sub">${escapeHtml(t("results.sub"))}</div></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" id="export-csv-btn">${iconSvg("download",13)} ${escapeHtml(t("export.csv"))}</button>
+        <button class="btn btn-sm" id="export-print-btn">${iconSvg("print",13)} ${escapeHtml(t("export.print"))}</button>
+      </div>
+    </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:16px;">
       <div class="card" style="display:flex;align-items:center;gap:14px;">
         ${donutSvg(overallPct, {size:72, stroke:8})}
@@ -1140,10 +1237,142 @@ async function renderResultsView(el){
         ${hasTrendData ? lineChartSvg(trendPoints, {width:460, height:150}) : `<div class="empty-state">${escapeHtml(t("results.noHistory"))}</div>`}
       </div>
     </div>`;
+  document.getElementById("export-csv-btn").addEventListener("click", () => exportMonthCsv(entriesMonth));
+  document.getElementById("export-print-btn").addEventListener("click", () => printMonthReport(entriesMonth));
 }
 function pendingApprovalCountAll(){
   const list = entriesCache[entriesMonth] || [];
   return list.filter(e => ["submitted","goal_approved","responsible_approved"].includes(e.status)).length;
+}
+
+/* ============================================================
+   EXPORT (CSV + print/PDF) — reused by Results and Archive views
+   ============================================================ */
+function buildMonthlyReportRows(month, cache){
+  const rows = [];
+  structure.forEach(cat => {
+    cat.goals.forEach(goal => {
+      goal.elements.forEach(el => {
+        const entry = cache
+          ? (cache||[]).find(e => e.elementId===el.id && e.month===month) || null
+          : (findEntry(entriesCache[month], el.id));
+        let plan = null, fact = null, statusLabel;
+        if (!entry) statusLabel = t("export.statusNone");
+        else if (entry.status === "locked") {
+          plan = entry.plan; fact = entry.fact;
+          statusLabel = computeStatus(entry.plan, entry.fact, el.direction) === "good" ? t("export.statusGood") : t("export.statusBad");
+        } else { plan = entry.plan; fact = entry.fact; statusLabel = t("export.statusPending"); }
+        rows.push({
+          category: catName(cat), goal: goal.title || t("assign.unnamedGoal"),
+          element: el.name || t("assign.unnamedElement"), unit: el.unit || "",
+          plan: plan!=null?plan:"", fact: fact!=null?fact:"",
+          status: statusLabel, owner: el.elementOwnerUid ? userLabel(el.elementOwnerUid) : t("board.notAssigned")
+        });
+      });
+    });
+  });
+  return rows;
+}
+function reportCsvRows(month, cache){
+  const header = [t("export.colCategory"),t("export.colGoal"),t("export.colElement"),t("export.colUnit"),t("export.colPlan"),t("export.colFact"),t("export.colStatus"),t("export.colOwner")];
+  const rows = buildMonthlyReportRows(month, cache);
+  return [header, ...rows.map(r=>[r.category,r.goal,r.element,r.unit,r.plan,r.fact,r.status,r.owner])];
+}
+function exportMonthCsv(month){
+  downloadCsv(`bpd-hisobot-${month}.csv`, reportCsvRows(month));
+}
+function printMonthReport(month){
+  const rows = buildMonthlyReportRows(month);
+  const win = window.open("", "_blank");
+  if (!win) { toast(t("common.error")+"popup blocked", true); return; }
+  const style = "body{font-family:Arial,sans-serif;padding:24px;color:#111;}"
+    + "h1{font-size:18px;margin-bottom:2px;}.sub{color:#555;font-size:12px;margin-bottom:16px;}"
+    + "table{width:100%;border-collapse:collapse;font-size:11.5px;}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;}th{background:#f0f0f0;}"
+    + "@media print{@page{margin:14mm;}}";
+  const bodyRows = rows.map(r => `<tr><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.goal)}</td><td>${escapeHtml(r.element)}</td><td>${escapeHtml(r.unit)}</td><td>${escapeHtml(String(r.plan))}</td><td>${escapeHtml(String(r.fact))}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.owner)}</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(t("export.title"))} — ${monthYear(month)}</title><style>${style}</style></head>
+    <body>
+      <h1>UzAuto Motors &middot; ${escapeHtml(t("export.title"))} &mdash; ${monthYear(month)}</h1>
+      <div class="sub">${escapeHtml(t("export.generatedAt"))}${fmtDateTime(new Date())}</div>
+      <table><thead><tr><th>${escapeHtml(t("export.colCategory"))}</th><th>${escapeHtml(t("export.colGoal"))}</th><th>${escapeHtml(t("export.colElement"))}</th><th>${escapeHtml(t("export.colUnit"))}</th><th>${escapeHtml(t("export.colPlan"))}</th><th>${escapeHtml(t("export.colFact"))}</th><th>${escapeHtml(t("export.colStatus"))}</th><th>${escapeHtml(t("export.colOwner"))}</th></tr></thead>
+      <tbody>${bodyRows}</tbody></table>
+      <script>window.onload=function(){setTimeout(function(){window.print();},200);};<\/script>
+    </body></html>`;
+  win.document.open(); win.document.write(html); win.document.close();
+}
+
+/* ============================================================
+   ARCHIVE VIEW (multi-year history, per category, 12-month grid)
+   ============================================================ */
+async function ensureArchiveYearLoaded(year){
+  if (archiveCache[year]) return archiveCache[year];
+  const months = [];
+  for (let m = 1; m <= 12; m++) months.push(year + "-" + String(m).padStart(2,"0"));
+  archiveCache[year] = await fb.listEntriesForMonths(months);
+  return archiveCache[year];
+}
+function monthsOfYear(year){
+  const out = [];
+  for (let m = 1; m <= 12; m++) out.push(year + "-" + String(m).padStart(2,"0"));
+  return out;
+}
+async function renderArchiveView(el){
+  const nowYear = new Date().getFullYear();
+  const years = [nowYear, nowYear-1, nowYear-2];
+  await ensureArchiveYearLoaded(archiveYear);
+  if (!archiveCategoryId || !findCat(archiveCategoryId)) archiveCategoryId = structure[0] ? structure[0].id : null;
+  const cache = archiveCache[archiveYear];
+  const monthsArr = monthsOfYear(archiveYear);
+  const monthLabels = monthsArr.map((m,i) => monthShort(i));
+  const hasAny = (cache||[]).some(e => e.status === "locked");
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div><div class="page-title">${escapeHtml(t("archive.title"))}</div><div class="page-sub">${escapeHtml(t("archive.sub"))}</div></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="archive-year">${years.map(y=>`<option value="${y}" ${y===archiveYear?"selected":""}>${y}</option>`).join("")}</select>
+        <button class="btn btn-sm" id="archive-csv-btn">${iconSvg("download",13)} ${escapeHtml(t("archive.downloadYear"))}</button>
+      </div>
+    </div>
+    <div class="summary">${structure.map(c => `
+      <button class="cat-chip" data-arch-cat="${c.id}" aria-pressed="${c.id===archiveCategoryId}">
+        <div class="cat-chip-top"><span class="cat-icon">${iconSvg(c.icon)}</span><span class="cat-name">${escapeHtml(catName(c))}</span></div>
+      </button>`).join("")}</div>
+    <div id="archive-detail"></div>
+  `;
+  document.getElementById("archive-year").addEventListener("change", async (e) => {
+    archiveYear = parseInt(e.target.value, 10);
+    await renderMain();
+  });
+  document.getElementById("archive-csv-btn").addEventListener("click", () => exportYearCsv(archiveYear, archiveCache[archiveYear]));
+  el.querySelectorAll("[data-arch-cat]").forEach(b => b.addEventListener("click", () => { archiveCategoryId = b.getAttribute("data-arch-cat"); renderMain(); }));
+  document.getElementById("archive-detail").innerHTML = archiveDetailHtml(findCat(archiveCategoryId), monthsArr, monthLabels, cache, hasAny);
+}
+function archiveDetailHtml(cat, monthsArr, monthLabels, cache, hasAny){
+  if (!cat) return "";
+  if (!hasAny) return `<div class="empty-state">${escapeHtml(t("archive.noData"))}</div>`;
+  let rows = "";
+  cat.goals.forEach((goal, gi) => {
+    const statuses = monthsArr.map(m => {
+      const v = goalOkForMonth(goal, m, cache);
+      return v === true ? "good" : v === false ? "bad" : null;
+    });
+    rows += `<tr>
+      <td class="mono" style="color:var(--muted);">${gi+1}</td>
+      <td class="archive-goal-label">${escapeHtml(goal.title || t("assign.unnamedGoal"))}</td>
+      <td>${statusStripSvg(statuses, monthLabels, {cell:16,gap:4})}</td>
+    </tr>`;
+  });
+  return `<div class="card" style="overflow-x:auto;"><table class="archive-table"><tbody>${rows}</tbody></table></div>`;
+}
+function exportYearCsv(year, cache){
+  const monthsArr = monthsOfYear(year);
+  const header = [t("export.colMonth"), t("export.colCategory"), t("export.colGoal"), t("export.colElement"), t("export.colUnit"), t("export.colPlan"), t("export.colFact"), t("export.colStatus"), t("export.colOwner")];
+  const allRows = [header];
+  monthsArr.forEach(m => {
+    buildMonthlyReportRows(m, cache).forEach(r => allRows.push([monthYear(m), r.category, r.goal, r.element, r.unit, r.plan, r.fact, r.status, r.owner]));
+  });
+  downloadCsv(`bpd-arxiv-${year}.csv`, allRows);
 }
 
 /* ============================================================
