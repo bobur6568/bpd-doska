@@ -11,9 +11,19 @@
   <div id="root">
     <div class="boot-screen">
       <div class="boot-spinner"></div>
-      <div class="boot-text">Yuklanmoqda...</div>
+      <div class="boot-text" id="boot-text">Yuklanmoqda...</div>
     </div>
   </div>
+  <script>
+    try {
+      var _bpdLang = localStorage.getItem("bpd_lang");
+      var _bpdBoot = { uz: "Yuklanmoqda...", en: "Loading...", ru: "Загрузка..." };
+      if (_bpdLang && _bpdBoot[_bpdLang]) {
+        document.getElementById("boot-text").textContent = _bpdBoot[_bpdLang];
+        document.documentElement.lang = _bpdLang;
+      }
+    } catch (e) { /* localStorage unavailable */ }
+  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
