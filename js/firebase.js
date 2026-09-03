@@ -93,6 +93,72 @@ export async function createUserAccount({ username, password, fullName, workplac
   }
 }
 
+/* Admin uchun "login/parolni almashtirish": Firebase'ning bepul (Spark)
+   rejasida boshqa foydalanuvchining login/parolini to'g'ridan-to'g'ri
+   o'zgartirib bo'lmaydi (buning uchun server tomonlama Admin SDK/Cloud
+   Function kerak, u pullik Blaze rejani talab qiladi). Shu sabab bu yerda
+   amaliy muqobil qo'llaniladi: eski hisob bilan bir xil ism/rol/hujjatlar
+   bilan YANGI hisob yaratiladi, joriy tayinlovlar (kategoriya/element
+   mas'uliyati, mas'ul lavozimi) avtomatik yangi hisobga ko'chiriladi va
+   eski hisob nofaollashtiriladi (uning Firebase Auth yozuvini o'chirib
+   bo'lmaydi, lekin "active:false" tufayli u bilan tizimga kirib bo'lmaydi —
+   main.js buni tekshiradi). */
+export async function reassignUserCredentials(oldUid, { username, password }){
+  const oldSnap = await getDoc(doc(db, "users", oldUid));
+  if (!oldSnap.exists()) throw new Error("Foydalanuvchi topilmadi");
+  const oldData = oldSnap.data();
+  const email = usernameToEmail(username);
+  const secondaryName = "secondary-" + Date.now();
+  const secondaryApp = initializeApp(firebaseConfig, secondaryName);
+  const secondaryAuth = getAuth(secondaryApp);
+  let newUid;
+  try {
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    newUid = cred.user.uid;
+    await signOut(secondaryAuth);
+    await setDoc(doc(db, "users", newUid), {
+      username: username.trim().toLowerCase(),
+      fullName: oldData.fullName || "",
+      workplace: oldData.workplace || "",
+      position: oldData.position || "",
+      photo: oldData.photo || null,
+      role: oldData.role,
+      active: true,
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser ? auth.currentUser.uid : null,
+      replacesUid: oldUid
+    });
+  } finally {
+    await deleteApp(secondaryApp).catch(()=>{});
+  }
+
+  // joriy tayinlovlarni (goalOwner/elementOwner/responsible) yangi UID'ga ko'chirish
+  const catsSnap = await getDocs(collection(db, "structure_categories"));
+  for (const catDoc of catsSnap.docs) {
+    if (catDoc.data().goalOwnerUid === oldUid) {
+      await updateDoc(doc(db, "structure_categories", catDoc.id), { goalOwnerUid: newUid });
+    }
+    const goalsSnap = await getDocs(collection(db, "structure_categories", catDoc.id, "goals"));
+    for (const goalDoc of goalsSnap.docs) {
+      const elsSnap = await getDocs(collection(db, "structure_categories", catDoc.id, "goals", goalDoc.id, "elements"));
+      for (const elDoc of elsSnap.docs) {
+        if (elDoc.data().elementOwnerUid === oldUid) {
+          await updateDoc(doc(db, "structure_categories", catDoc.id, "goals", goalDoc.id, "elements", elDoc.id), { elementOwnerUid: newUid });
+        }
+      }
+    }
+  }
+  const settingsSnap = await getDoc(doc(db, "settings", "assignments"));
+  if (settingsSnap.exists() && settingsSnap.data().responsibleUid === oldUid) {
+    await updateDoc(doc(db, "settings", "assignments"), { responsibleUid: newUid });
+  }
+
+  // eski hisobni nofaollashtirish (login endi ishlamaydi)
+  await updateDoc(doc(db, "users", oldUid), { active: false, replacedByUid: newUid, replacedAt: serverTimestamp() });
+
+  return newUid;
+}
+
 export async function listUsers(){
   const snap = await getDocs(collection(db, "users"));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
