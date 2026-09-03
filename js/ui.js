@@ -1156,10 +1156,14 @@ async function renderUsersView(el){
           <td><span class="role-tag">${escapeHtml(roleLabel(u.role))}</span></td>
           <td>${escapeHtml(u.workplace||"—")}${u.position?` &middot; ${escapeHtml(u.position)}`:""}</td>
           <td>${u.active===false?`<span class="pill pill-bad">${escapeHtml(t("users.inactive"))}</span>`:`<span class="pill pill-good">${escapeHtml(t("users.active"))}</span>`}</td>
-          <td><button class="btn btn-sm edit-user-btn" data-uid="${u.id}">${escapeHtml(t("users.edit"))}</button></td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm edit-user-btn" data-uid="${u.id}">${escapeHtml(t("users.edit"))}</button>
+            ${u.active!==false?`<button class="btn btn-sm replace-cred-btn" data-uid="${u.id}">${escapeHtml(t("users.replaceCred"))}</button>`:""}
+          </td>
         </tr>`).join("")}</tbody>
     </table></div>`;
   document.getElementById("new-user-btn").addEventListener("click", () => openUserModal(null));
+  el.querySelectorAll(".replace-cred-btn").forEach(b => b.addEventListener("click", () => openReplaceCredentialsModal(usersById[b.getAttribute("data-uid")])));
   el.querySelectorAll(".edit-user-btn").forEach(b => b.addEventListener("click", () => openUserModal(usersById[b.getAttribute("data-uid")])));
   document.getElementById("csv-template-btn").addEventListener("click", downloadCsvUserTemplate);
   const fileInput = document.getElementById("csv-file-input");
@@ -1234,7 +1238,7 @@ function openUserModal(existing){
       <input type="file" accept="image/*" id="u-photo-input" style="display:none;">
     </div>
     <div class="field"><label>${escapeHtml(t("userModal.login"))}</label><input id="u-username" value="${isEdit?escapeHtml(existing.username||""):""}" ${isEdit?"disabled":""} placeholder="${escapeHtml(t("userModal.loginPh"))}"></div>
-    <div class="field"><label>${isEdit?escapeHtml(t("userModal.passwordNew")):escapeHtml(t("userModal.password"))}</label><input id="u-password" type="text" placeholder="${isEdit?"":escapeHtml(t("userModal.passwordPh"))}"></div>
+    ${isEdit ? "" : `<div class="field"><label>${escapeHtml(t("userModal.password"))}</label><input id="u-password" type="text" placeholder="${escapeHtml(t("userModal.passwordPh"))}"></div>`}
     <div class="field"><label>${escapeHtml(t("userModal.role"))}</label><select id="u-role">${roleOptions().map(r=>`<option value="${r.v}" ${isEdit&&existing.role===r.v?"selected":""}>${escapeHtml(r.l)}</option>`).join("")}</select></div>
     ${isEdit ? `<div class="field"><label>${escapeHtml(t("userModal.status"))}</label><select id="u-active"><option value="1" ${existing.active!==false?"selected":""}>${escapeHtml(t("users.active"))}</option><option value="0" ${existing.active===false?"selected":""}>${escapeHtml(t("users.inactive"))}</option></select></div>` : ""}
     ${isEdit ? `<div class="entry-meta">${escapeHtml(t("userModal.passwordNote"))}</div>` : ""}
@@ -1260,7 +1264,8 @@ function openUserModal(existing){
     const workplace = wrap.querySelector("#u-workplace").value.trim();
     const position = wrap.querySelector("#u-position").value.trim();
     const username = wrap.querySelector("#u-username").value.trim().toLowerCase();
-    const password = wrap.querySelector("#u-password").value;
+    const passwordInput = wrap.querySelector("#u-password");
+    const password = passwordInput ? passwordInput.value : "";
     const role = wrap.querySelector("#u-role").value;
     if (!fullName || !username) { errEl.textContent = t("userModal.requiredNameLogin"); return; }
     if (!isEdit && (!password || password.length < 6)) { errEl.textContent = t("userModal.passwordMin"); return; }
@@ -1280,6 +1285,53 @@ function openUserModal(existing){
     } catch (err) {
       errEl.textContent = t("common.error") + (err.code==="auth/email-already-in-use" ? t("userModal.loginTaken") : err.message);
       saveBtn.disabled = false; saveBtn.textContent = isEdit?t("common.save"):t("userModal.create");
+    }
+  });
+}
+
+/* Admin: bitta foydalanuvchi uchun yangi login/parol bilan yangi hisob
+   yaratadi (Spark rejada boshqa foydalanuvchining parolini to'g'ridan-to'g'ri
+   o'zgartirib bo'lmasligi sababli) va joriy tayinlovlarni unga ko'chiradi. */
+function openReplaceCredentialsModal(existing){
+  if (!existing) return;
+  const wrap = openModal(`
+    <h3>${escapeHtml(t("userModal.replaceCredTitle"))}</h3>
+    <div class="entry-meta" style="margin-bottom:10px;">${escapeHtml(existing.fullName||existing.username)} &middot; ${escapeHtml(t("userModal.currentLogin"))}${escapeHtml(existing.username||"")}</div>
+    <div class="reject-reason" style="margin-bottom:12px;">${escapeHtml(t("userModal.replaceCredWarning"))}</div>
+    <div class="field"><label>${escapeHtml(t("userModal.newLogin"))}</label><input id="rc-username" placeholder="${escapeHtml(t("userModal.loginPh"))}"></div>
+    <div class="field"><label>${escapeHtml(t("userModal.newPassword"))}</label><input id="rc-password" type="text" placeholder="${escapeHtml(t("userModal.passwordPh"))}"></div>
+    <div class="error-text" id="rc-err"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" id="rc-cancel">${escapeHtml(t("common.cancel"))}</button>
+      <button class="btn btn-primary" id="rc-confirm">${escapeHtml(t("userModal.replaceCredConfirm"))}</button>
+    </div>
+  `);
+  wrap.querySelector("#rc-cancel").addEventListener("click", closeModal);
+  wrap.querySelector("#rc-confirm").addEventListener("click", async () => {
+    const errEl = wrap.querySelector("#rc-err");
+    errEl.textContent = "";
+    const username = wrap.querySelector("#rc-username").value.trim().toLowerCase();
+    const password = wrap.querySelector("#rc-password").value;
+    if (!username) { errEl.textContent = t("userModal.requiredNameLogin"); return; }
+    if (!password || password.length < 6) { errEl.textContent = t("userModal.passwordMin"); return; }
+    const btn = wrap.querySelector("#rc-confirm"); btn.disabled = true; btn.textContent = t("common.saving");
+    try {
+      await fb.reassignUserCredentials(existing.id, { username, password });
+      const fresh = await fb.listUsers();
+      usersById = {}; fresh.forEach(u => usersById[u.id] = u);
+      wrap.querySelector(".modal").innerHTML = `
+        <h3>${escapeHtml(t("userModal.replaceCredDoneTitle"))}</h3>
+        <div class="entry-meta" style="margin-bottom:10px;">${escapeHtml(t("userModal.replaceCredDoneNote"))}</div>
+        <div class="field"><label>${escapeHtml(t("userModal.newLogin"))}</label><div class="mono" style="padding:9px 11px;border:1px solid var(--border-soft);border-radius:8px;background:var(--surface-2);">${escapeHtml(username)}</div></div>
+        <div class="field"><label>${escapeHtml(t("userModal.newPassword"))}</label><div class="mono" style="padding:9px 11px;border:1px solid var(--border-soft);border-radius:8px;background:var(--surface-2);">${escapeHtml(password)}</div></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-primary" id="rc-done">${escapeHtml(t("common.close"))}</button>
+        </div>`;
+      wrap.querySelector("#rc-done").addEventListener("click", async () => { closeModal(); await renderMain(); });
+      toast(t("userModal.replaceCredDone"));
+    } catch (err) {
+      errEl.textContent = t("common.error") + (err.code==="auth/email-already-in-use" ? t("userModal.loginTaken") : err.message);
+      btn.disabled = false; btn.textContent = t("userModal.replaceCredConfirm");
     }
   });
 }
