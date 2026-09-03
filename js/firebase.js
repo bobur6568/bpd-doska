@@ -258,10 +258,12 @@ export function nextQuarterTs(fromDate){
   return Timestamp.fromMillis((fromDate || new Date()).getTime() + QUARTER_MS);
 }
 
+// Mas'ul maqsad egasini istalgan vaqt qayta tayinlashi mumkin — kvartalga
+// bog'liq cheklov faqat responsible/elementOwner bog'lanishlarida qoladi.
 export async function assignGoalOwner(categoryId, uid){
   const now = new Date();
   return updateDoc(doc(db, "structure_categories", categoryId), {
-    goalOwnerUid: uid, goalOwnerAssignedAt: Timestamp.fromDate(now), goalOwnerNextChangeAt: nextQuarterTs(now)
+    goalOwnerUid: uid, goalOwnerAssignedAt: Timestamp.fromDate(now), goalOwnerNextChangeAt: null
   });
 }
 
