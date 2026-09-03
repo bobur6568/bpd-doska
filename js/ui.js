@@ -962,17 +962,15 @@ async function renderAssignmentsView(el){
     el.innerHTML = `
       <div class="page-header"><div><div class="page-title">${escapeHtml(t("assign.title"))}</div><div class="page-sub">${escapeHtml(t("assign.sub.goalOwner"))}</div></div></div>
       <div class="grid grid-cards">${structure.map(cat => {
-        const locked = isLocked(cat.goalOwnerNextChangeAt);
         return `<div class="card" data-assign-cat="${cat.id}">
           <div style="font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;">${iconSvg(cat.icon)} ${escapeHtml(catName(cat))}</div>
           <div class="field"><label>${escapeHtml(t("assign.goalOwner"))}</label>
-            <select class="assign-goalowner-select" ${locked?"disabled":""}>
+            <select class="assign-goalowner-select">
               <option value="">${escapeHtml(t("common.notSelected"))}</option>
               ${candidates.map(u=>`<option value="${u.id}" ${cat.goalOwnerUid===u.id?"selected":""}>${escapeHtml(u.fullName||u.username)}</option>`).join("")}
             </select>
           </div>
-          ${lockNote(cat.goalOwnerNextChangeAt)}
-          <button class="btn btn-primary btn-sm assign-goalowner-btn" style="margin-top:8px;" ${locked?"disabled":""}>${escapeHtml(t("common.assign"))}</button>
+          <button class="btn btn-primary btn-sm assign-goalowner-btn" style="margin-top:8px;">${escapeHtml(t("common.assign"))}</button>
         </div>`;
       }).join("")}</div>
       ${candidates.length===0?`<div class="entry-meta" style="margin-top:10px;">${escapeHtml(t("assign.noGoalOwnerCandidates"))}</div>`:""}`;
